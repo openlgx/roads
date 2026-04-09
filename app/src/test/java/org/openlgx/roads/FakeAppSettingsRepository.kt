@@ -44,4 +44,6 @@ class FakeAppSettingsRepository(
     override suspend fun setCaptureMinSpeedMps(mps: Float) = Unit
 
     override suspend fun setDebugModeEnabled(enabled: Boolean) = Unit
+
+    override suspend fun setCalibrationWorkflowEnabled(enabled: Boolean) = Unit
 }

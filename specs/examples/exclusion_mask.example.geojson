@@ -1,0 +1,32 @@
+{
+  "type": "FeatureCollection",
+  "olgxMaskVersion": "0.1.0",
+  "councilId": "example_council_demo",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "excl-demo-rail-001",
+        "reason": "rail_crossing",
+        "source": "example_gis_import_v1",
+        "validFrom": "2026-01-01T00:00:00Z",
+        "validTo": null,
+        "metadata": {
+          "assetNote": "Illustrative 40 m buffer polygon — replace with real geometry"
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [151.0, -33.75],
+            [151.001, -33.75],
+            [151.001, -33.749],
+            [151.0, -33.749],
+            [151.0, -33.75]
+          ]
+        ]
+      }
+    }
+  ]
+}

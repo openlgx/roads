@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openlgx.org/roads/spec/geo_exclusion_mask-0.1",
+  "title": "OLGX Geo exclusion mask (GeoJSON wrapper)",
+  "description": "Council-maintained geometries to down-weight or exclude samples (e.g. rail crossings) before segment aggregation. Version 0.1 stub — not enforced by the app yet.",
+  "type": "object",
+  "required": ["type", "olgxMaskVersion", "features"],
+  "properties": {
+    "type": { "const": "FeatureCollection" },
+    "olgxMaskVersion": {
+      "type": "string",
+      "description": "Semantic version of this schema contract (e.g. 0.1.0)."
+    },
+    "councilId": {
+      "type": "string",
+      "description": "Optional stable council or tenant identifier."
+    },
+    "features": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/exclusionFeature" }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "exclusionFeature": {
+      "type": "object",
+      "required": ["type", "geometry", "properties"],
+      "properties": {
+        "type": { "const": "Feature" },
+        "geometry": {
+          "description": "Polygon or MultiPolygon in WGS84 (EPSG:4326) lon/lat.",
+          "oneOf": [
+            { "type": "object", "properties": { "type": { "const": "Polygon" } }, "required": ["type", "coordinates"] },
+            { "type": "object", "properties": { "type": { "const": "MultiPolygon" } }, "required": ["type", "coordinates"] },
+            { "type": "object", "properties": { "type": { "const": "LineString" } }, "required": ["type", "coordinates"] }
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "required": ["id", "reason", "source"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Stable id within the council dataset (e.g. UUID or asset id)."
+            },
+            "reason": {
+              "type": "string",
+              "description": "Machine-oriented reason code.",
+              "enum": [
+                "rail_crossing",
+                "ferry_ramp",
+                "expansion_joint",
+                "speed_table",
+                "level_crossing_equipment",
+                "construction_zone",
+                "other_designed_rough",
+                "other"
+              ]
+            },
+            "source": {
+              "type": "string",
+              "description": "Provenance: system name, dataset name, or \"manual\"."
+            },
+            "validFrom": {
+              "type": ["string", "null"],
+              "description": "ISO-8601 UTC instant when mask becomes effective; null if unknown."
+            },
+            "validTo": {
+              "type": ["string", "null"],
+              "description": "ISO-8601 UTC instant when mask expires; null if open-ended."
+            },
+            "metadata": {
+              "type": "object",
+              "description": "Optional opaque key/values (e.g. council reference number).",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

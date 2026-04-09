@@ -2,3 +2,5 @@
 pandas>=2.0.0
 numpy>=1.24.0
 matplotlib>=3.7.0
+contextily>=1.4.0
+pyproj>=3.6.0

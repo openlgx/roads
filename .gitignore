@@ -27,6 +27,9 @@ captures/
 # Python offline analysis (local outputs / venv)
 analysis_output/
 .venv_analysis/
+**/__pycache__/
+*.py[cod]
+roughness_lab_output/
 
 # Local app export bundles (often contain location/sensor data; keep out of git by default)
 exports/

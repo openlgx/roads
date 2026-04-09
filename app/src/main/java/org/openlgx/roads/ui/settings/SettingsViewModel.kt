@@ -37,6 +37,7 @@ constructor(
                     localCompactionEnabled = false,
                     captureMinSpeedMps = 4.5f,
                     debugModeEnabled = false,
+                    calibrationWorkflowEnabled = false,
                 ),
         )
 
@@ -86,5 +87,9 @@ constructor(
 
     fun setDebugMode(enabled: Boolean) {
         viewModelScope.launch { appSettingsRepository.setDebugModeEnabled(enabled) }
+    }
+
+    fun setCalibrationWorkflowEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setCalibrationWorkflowEnabled(enabled) }
     }
 }

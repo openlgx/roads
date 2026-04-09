@@ -11,11 +11,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.io.DEFAULT_BUFFER_SIZE
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import org.openlgx.roads.BuildConfig
 import org.openlgx.roads.data.local.db.RoadsDatabase
+import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.data.local.db.entity.DeviceProfileEntity
 import org.openlgx.roads.data.repo.session.SessionInspectionRepository
 import org.openlgx.roads.validation.SessionCaptureValidationSummary
@@ -34,6 +36,7 @@ constructor(
     private val database: RoadsDatabase,
     private val sessionInspectionRepository: SessionInspectionRepository,
     private val exportDiagnosticsRepository: ExportDiagnosticsRepository,
+    private val appSettingsRepository: AppSettingsRepository,
 ) {
 
     suspend fun exportSession(sessionId: Long): Result<SessionExportResult> =
@@ -54,6 +57,8 @@ constructor(
                 writeSensorCsvAndJson(dir, sessionId)
 
                 val profile = database.deviceProfileDao().firstOrNull()
+                val calibrationWorkflowEnabled =
+                    appSettingsRepository.settings.first().calibrationWorkflowEnabled
                 val manifest =
                     buildManifest(
                         exportDir = dir,
@@ -63,6 +68,7 @@ constructor(
                         sensorCount = detail.sensorSampleCount,
                         validation = detail.validation,
                         deviceProfile = profile,
+                        calibrationWorkflowEnabled = calibrationWorkflowEnabled,
                     )
                 File(dir, "manifest.json").writeText(manifest.toString(2))
 
@@ -96,6 +102,7 @@ constructor(
         sensorCount: Long,
         validation: SessionCaptureValidationSummary,
         deviceProfile: DeviceProfileEntity?,
+        calibrationWorkflowEnabled: Boolean,
     ): JSONObject {
         val files =
             JSONArray().apply {
@@ -155,6 +162,8 @@ constructor(
             put("files", files)
             put("device", device)
             put("validationSummary", validationJson)
+            put("calibrationWorkflowEnabled", calibrationWorkflowEnabled)
+            put("calibrationLiteraturePointer", ExportConstants.CALIBRATION_LITERATURE_POINTER)
         }
     }
 

@@ -31,6 +31,7 @@ constructor(
         val localCompactionEnabled = booleanPreferencesKey("local_compaction_enabled")
         val captureMinSpeedMps = floatPreferencesKey("capture_min_speed_mps")
         val debugModeEnabled = booleanPreferencesKey("debug_mode_enabled")
+        val calibrationWorkflowEnabled = booleanPreferencesKey("calibration_workflow_enabled")
     }
 
     override val settings: Flow<AppSettings> =
@@ -53,6 +54,7 @@ constructor(
                 localCompactionEnabled = prefs[Keys.localCompactionEnabled] ?: false,
                 captureMinSpeedMps = prefs[Keys.captureMinSpeedMps] ?: DEFAULT_MIN_SPEED_MPS,
                 debugModeEnabled = prefs[Keys.debugModeEnabled] ?: false,
+                calibrationWorkflowEnabled = prefs[Keys.calibrationWorkflowEnabled] ?: false,
             )
         }
 
@@ -115,6 +117,10 @@ constructor(
 
     override suspend fun setDebugModeEnabled(enabled: Boolean) {
         dataStore.edit { it[Keys.debugModeEnabled] = enabled }
+    }
+
+    override suspend fun setCalibrationWorkflowEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.calibrationWorkflowEnabled] = enabled }
     }
 
     private companion object {

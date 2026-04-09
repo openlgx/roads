@@ -29,6 +29,7 @@ import org.openlgx.roads.location.LocationRecordingController
 import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.permission.ActivityRecognitionPermissionChecker
 import org.openlgx.roads.permission.FineLocationPermissionChecker
+import org.openlgx.roads.processing.calibration.SessionCalibrationHook
 import org.openlgx.roads.service.CollectorForegroundServiceController
 import org.openlgx.roads.service.CollectorServiceStateRegistry
 import timber.log.Timber
@@ -47,6 +48,7 @@ constructor(
     private val locationRecordingController: LocationRecordingController,
     private val sensorRecordingController: SensorRecordingController,
     private val serviceStateRegistry: CollectorServiceStateRegistry,
+    private val sessionCalibrationHook: SessionCalibrationHook,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) : PassiveCollectionHandle {
     private val mailbox = Channel<Unit>(capacity = Channel.CONFLATED)
@@ -389,10 +391,17 @@ constructor(
         lifecycleState = CollectorLifecycleState.IDLE
         cooldownJob = null
         if (sid != null) {
+            val endedAt = System.currentTimeMillis()
             recordingSessionRepository.endRecordingSession(
                 sessionId = sid,
-                endedAtEpochMs = System.currentTimeMillis(),
+                endedAtEpochMs = endedAt,
                 endState = SessionState.COMPLETED,
+            )
+            sessionCalibrationHook.onRecordingSessionEnded(
+                sessionId = sid,
+                endState = SessionState.COMPLETED,
+                endedAtEpochMs = endedAt,
+                calibrationWorkflowEnabled = lastSettings!!.calibrationWorkflowEnabled,
             )
         }
         foregroundServiceController.stopCollectorService()
@@ -411,10 +420,17 @@ constructor(
             return
         }
         activeSessionId = null
+        val endedAt = System.currentTimeMillis()
         recordingSessionRepository.endRecordingSession(
             sessionId = sid,
-            endedAtEpochMs = System.currentTimeMillis(),
+            endedAtEpochMs = endedAt,
             endState = endState,
+        )
+        sessionCalibrationHook.onRecordingSessionEnded(
+            sessionId = sid,
+            endState = endState,
+            endedAtEpochMs = endedAt,
+            calibrationWorkflowEnabled = settings.calibrationWorkflowEnabled,
         )
         foregroundServiceController.stopCollectorService()
     }

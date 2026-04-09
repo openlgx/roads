@@ -1,0 +1,2 @@
+{"session_uuid":"00000000-0000-4000-8000-000000000001","window_start_ms":1000,"window_end_ms":2000,"label":"cornering","reviewer":"example","notes":"Template row — replace uuid and times with a real session"}
+{"session_uuid":"00000000-0000-4000-8000-000000000001","window_start_ms":5000,"window_end_ms":6000,"label":"vertical_impact","reviewer":"example","notes":"Template spike window"}

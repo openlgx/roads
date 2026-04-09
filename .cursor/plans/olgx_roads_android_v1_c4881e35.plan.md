@@ -410,6 +410,87 @@ Optional small Kotlin `validation/` package:
 
 ---
 
+## Calibration and literature (sensor → roughness / IRI)
+
+This section summarizes how **transport agencies and researchers** establish traceability for roughness measures, and how that differs from what a **consumer smartphone** can credibly claim. It informs future **`docs/calibration-notes.md`**, offline analysis in **`analysis/`**, and any `CalibrationRun` / device-baseline work—without changing the product stance that v1 scores are **experimental proxies**, not certified IRI.
+
+### Two calibration layers (do not conflate them)
+
+```mermaid
+flowchart LR
+  subgraph layerA [LayerA_device]
+    MEMS[MEMS_accel_gyro]
+    Factory[Factory_scale_bias]
+    UserCal[Multi_position_static_cal]
+  end
+  subgraph layerB [LayerB_application]
+    Mount[Mount_and_frame]
+    Vehicle[Vehicle_QC_dynamics]
+    Speed[Speed_context]
+    Map[Map_to_IRI_or_proxy]
+  end
+  Ground[Reference_profile_or_IRI]
+  MEMS --> Mount
+  Mount --> Vehicle
+  Vehicle --> Speed
+  Speed --> Map
+  Ground --> Map
+```
+
+- **Layer A — intrinsic sensor calibration:** Estimates **bias, scale factors, misalignment / cross-axis terms** (and sometimes temperature coefficients) for the IMU. For smartphones this is usually **factory** calibration; lab methods use **multi-static positions** exploiting gravity (and magnetometer field) as references, sometimes augmented with simple jigs or rate tables. This layer does **not** by itself yield IRI.
+- **Layer B — system / application calibration:** Maps **device-frame acceleration time series** (plus speed, possibly gyro) to **roughness-relevant features** or to **IRI-compatible indices**, accounting for **mount orientation**, **vehicle suspension (quarter-car / ride dynamics)**, **speed**, tire pressure, and road class. This is where crowd-sourced phone apps intersect the pavement literature.
+
+**OLGX implication:** v1 should **persist raw sensor streams + device profile + mount/surface labels** so Layer B can be revisited offline; Layer A is mostly **diagnostics** (e.g., flagging dead axes, absurd scales) unless you add an optional in-app static pose routine later.
+
+### Ground truth chain used by road agencies (what “true IRI” assumes)
+
+- **IRI definition from profile:** [ASTM E1926](https://www.astm.org/e1926-08r21.html) — standard practice for computing **International Roughness Index** from a **longitudinal elevation profile** using the **quarter-car simulation** (same conceptual bridge as most smartphone–IRI papers). IRI is **not** “an accelerometer reading”; it is a functional of **profile height** under a defined vehicle model.
+- **Reference profilers (laser + inertial):** [ASTM E950 / E950M](https://www.astm.org/e0950_e0950m-09.html) — test method for longitudinal profile measurement using **inertial reference + height/distance sensors** on survey vehicles. U.S. agency practice ties profiler **certification / QC** to **AASHTO R 56** (certification of inertial profiling systems) and **AASHTO R 57** (operation and verification, including bounce/correlation checks). Background on the R 56 revision program is summarized in TRB’s **[Research In Progress entry on the R 56 update](https://rip.trb.org/View/1628603)**. State DOTs also publish operational manuals derived from these practices (e.g. California’s **[CTM 387 — operation, calibration, operator certification of inertial profilers](https://dot.ca.gov/-/media/dot-media/programs/engineering/documents/californiatestmethods-ctm/ctm-387-a11y.pdf)**). These processes control **profile accuracy** and repeatability—not phone accelerometer tabs.
+
+**Takeaway for OLGX:** If you ever compare to council data, the honest baseline is **profiler IRI on aligned segments**, with documented **spatial join error**, **speed effects**, and **wheel-track vs phone-path mismatch**—not a single-axis RMS “calibrated” by wishful thinking.
+
+### How smartphone / connected-vehicle papers “calibrate” to IRI
+
+Published approaches usually combine:
+
+1. **Physics-informed link:** Quarter-car (or richer) vehicle models relate **vertical body acceleration** to **profile spatial frequencies** and thus to **IRI** via the same simulation kernel as E1926 conceptually uses. Papers often estimate suspension parameters **per vehicle class** or **per calibration drive**.
+2. **Empirical fit:** Regress **hand-crafted features** (RMS, bands, PSD statistics, jerk, speed-normalized terms) against **reference IRI** from profilers or survey vehicles.
+3. **Machine learning:** Classify **roughness bins** or regress **IRI** from IMU features (risk: domain shift when vehicle/mount/phone changes).
+
+**Representative literature (non-exhaustive):**
+
+| Theme | Example | Why it matters |
+|--------|---------|----------------|
+| Theoretical QC + validation vs DSV | [TRID record 2001788](https://trid.trb.org/View/2001788) / [IJPE (2021), doi:10.1080/10298436.2021.1881783](https://www.tandfonline.com/doi/full/10.1080/10298436.2021.1881783) | Quarter-car style link between **smartphone acceleration** and **IRI**; reports **low relative error vs digital survey vehicle** under their test conditions—useful methodology, not a blanket accuracy guarantee. |
+| Android smartphone field study | [ASCE Library — J. Perform. Constr. Facil. (evaluation using Android smartphone)](https://ascelibrary.org/doi/10.1061/JPEODX.0000058) | Typical pipeline: collect IMU in-traffic, feature extraction, correlation / modeling vs reference roughness—good template for **protocol design** (speed, routes, repeat runs). |
+| ML classification from smartphone sensors | [Scientific Reports (2025), Nature Portfolio](https://www.nature.com/articles/s41598-025-34396-3) | Illustrates **SVM / feature-based** roughness classifiers; useful for **ordinal “good/fair/poor”** thinking, with usual cautions on **generalization**. |
+| Quarter-car parameter estimation (book chapter) | [Taylor & Francis chapter — quarter-car parameter estimation, smartphone road profile](https://www.taylorfrancis.com/chapters/edit/10.1201/9781003090564-27/quarter-car-parameter-estimation-application-road-profile-evaluation-using-smartphone-xue-nagayama-su) | Directly addresses **parameter identifiability** and **estimation** for QC models from phone data—relevant if OLGX moves beyond ad-hoc RMS windows. |
+| Vehicle-mounted accelerometers → roughness | [Journal of Sensors (2016), doi:10.1155/2016/8413146](https://doi.org/10.1155/2016/8413146) | Older but clear articulation of **acceleration-based roughness** vs traditional profilometry—good for citations in **`docs/calibration-notes.md`**. |
+| Profiler certification context (industry) | [ASTM E950-22 + AASHTO R56 alignment — vendor summary](https://www.roadprofile.com/astm-e950-profiler-certification-updated/) | Helps explain to stakeholders why **phone proxies** are not interchangeable with **certified profilers** without a full validation program. |
+
+**MEMS / phone hardware calibration background (Layer A):**
+
+- Consumer MEMS errors (bias, noise, misalignment) and impact on navigation are surveyed in open literature; e.g. testing-oriented discussion in [PMC — smartphone MEMS errors](https://pmc.ncbi.nlm.nih.gov/articles/PMC10490716/) / [MDPI Sensors](https://www.mdpi.com/1424-8220/23/17/7609). Multi-position static methods remain the practical reference class for **DIY IMU calibration** without a turntable.
+
+### What OLGX should do in phased work (no change to v1 non-goals)
+
+- **Keep claiming:** experimental **proxy** only; align copy with README / export disclaimers.
+- **Capture metadata that makes later calibration possible:** device model/OS, sensor list, sampling mode, **mount**, **surface class**, optional tyre pressure / vehicle type; store **DEVICE frame** explicitly until a rotation pipeline exists.
+- **Offline analysis (`analysis/`):** Prefer **speed-stratified** windows, **repeat-run protocols**, and optional **physics-inspired features** (QC band shaping) *before* chasing ML. When reference IRI exists, document **alignment method** and **error metrics** (MAE, MAPE, calibration curve) per **device cohort**, not global.
+- **Documentation:** Fold this section’s distinction (Layer A vs B; E1926 vs E950/R56) into **`docs/calibration-notes.md`** when that doc lands (P7), so field volunteers understand **why** “calibration” on a kitchen table differs from “calibration” vs a laser profiler.
+
+### Phase F Android implementation checklist (activate calibration workflow)
+
+**Implemented in repo:**
+
+- [`docs/calibration-notes.md`](c:/cursor-dev/roads/docs/calibration-notes.md); README Phase F + export manifest docs.
+- **`AppSettings.calibrationWorkflowEnabled`** (DataStore `calibration_workflow_enabled`, default `false`); Settings toggle under “Phase F — calibration workflow”.
+- **`SessionCalibrationHook` / `SessionCalibrationHookImpl`** + **`CalibrationModule`**; coordinator calls hook after **`endRecordingSession`** (anchors only when flag on and **`SessionState.COMPLETED`**).
+- **`SessionExporter`** manifest: `calibrationWorkflowEnabled`, `calibrationLiteraturePointer`; **`ExportConstants`**: schema **2**, method **2c-2**, pointer constant.
+- **`RoadmapProcessingPhases`**; **`FakeAppSettingsRepository`** + unit tests updated.
+
+---
+
 ## Risk list (rework and science hazards)
 
 1. **Device-frame vs vehicle-frame motion** — major source of “looks wrong on some mounts”; rework likely when you add rotation to vehicle axes.

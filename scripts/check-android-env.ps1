@@ -94,8 +94,18 @@ function Get-AndroidEnvironmentInfo {
     $info.GradlewBat = $gradlewBat
 
     $javaHome = $env:JAVA_HOME
+    $studioJbr = Join-Path $env:ProgramFiles "Android\Android Studio\jbr"
     if ([string]::IsNullOrWhiteSpace($javaHome)) {
-        [void]$info.Warnings.Add("JAVA_HOME is not set. Gradle may still work if `java` is on PATH (e.g., Android Studio JBR).")
+        if (Test-Path -LiteralPath (Join-Path $studioJbr "bin\java.exe")) {
+            [void]$info.Warnings.Add(
+                "JAVA_HOME is not set. Gradle will fail from a plain shell. Fix: `$env:JAVA_HOME = '$studioJbr' " +
+                "or run: .\scripts\run-gradle.ps1 <tasks> (see README Prerequisites)."
+            )
+        } else {
+            [void]$info.Warnings.Add(
+                "JAVA_HOME is not set and Android Studio JBR was not found at $studioJbr. Install JDK 17 or Android Studio."
+            )
+        }
     } elseif (-not (Test-Path -LiteralPath (Join-Path $javaHome "bin\java.exe"))) {
         [void]$info.Warnings.Add("JAVA_HOME is set but bin\java.exe was not found under: $javaHome")
     }
@@ -146,8 +156,15 @@ function Get-AndroidAdbOnlyEnvironmentInfo {
     $info.GradlewBat = $gradlewBat
 
     $javaHome = $env:JAVA_HOME
+    $studioJbr = Join-Path $env:ProgramFiles "Android\Android Studio\jbr"
     if ([string]::IsNullOrWhiteSpace($javaHome)) {
-        [void]$info.Warnings.Add("JAVA_HOME is not set. Gradle may still work if Java is on PATH.")
+        if (Test-Path -LiteralPath (Join-Path $studioJbr "bin\java.exe")) {
+            [void]$info.Warnings.Add(
+                "JAVA_HOME is not set. Use `$env:JAVA_HOME = '$studioJbr' or .\scripts\run-gradle.ps1 (see README)."
+            )
+        } else {
+            [void]$info.Warnings.Add("JAVA_HOME is not set. Install JDK 17 or Android Studio.")
+        }
     } elseif (-not (Test-Path -LiteralPath (Join-Path $javaHome "bin\java.exe"))) {
         [void]$info.Warnings.Add("JAVA_HOME is set but bin\java.exe was not found under: $javaHome")
     }

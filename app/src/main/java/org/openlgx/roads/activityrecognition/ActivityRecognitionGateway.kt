@@ -1,5 +1,6 @@
 package org.openlgx.roads.activityrecognition
 
+import android.content.Intent
 import com.google.android.gms.location.DetectedActivity
 import kotlinx.coroutines.flow.StateFlow
 
@@ -39,6 +40,13 @@ data class ActivityRecognitionSnapshot(
 
 interface ActivityRecognitionGateway {
     val snapshot: StateFlow<ActivityRecognitionSnapshot>
+
+    /**
+     * Applies an Activity Recognition result delivered to the manifest receiver (or any [Intent]
+     * carrying [com.google.android.gms.location.ActivityRecognitionResult]). Returns true if a
+     * result was applied.
+     */
+    fun ingestActivityRecognitionIntent(intent: Intent): Boolean
 
     suspend fun startUpdates()
 

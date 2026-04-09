@@ -1,6 +1,7 @@
 package org.openlgx.roads.collector
 
 import android.content.Context
+import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import com.google.android.gms.location.DetectedActivity
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +36,7 @@ import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.sensor.SensorRecordingUiState
 import org.openlgx.roads.permission.ActivityRecognitionPermissionChecker
 import org.openlgx.roads.permission.FineLocationPermissionChecker
+import org.openlgx.roads.processing.calibration.SessionCalibrationHook
 import org.openlgx.roads.service.CollectorForegroundServiceController
 import org.openlgx.roads.service.CollectorServiceStateRegistry
 import org.robolectric.RobolectricTestRunner
@@ -77,6 +79,7 @@ class PassiveCollectionCoordinatorTest {
                     locationRecordingController = FakeLocationRecordingController(),
                     sensorRecordingController = FakeSensorRecordingController(),
                     serviceStateRegistry = CollectorServiceStateRegistry(),
+                    sessionCalibrationHook = NoOpSessionCalibrationHook,
                     applicationScope = scope,
                 )
 
@@ -124,6 +127,7 @@ class PassiveCollectionCoordinatorTest {
                     locationRecordingController = FakeLocationRecordingController(),
                     sensorRecordingController = FakeSensorRecordingController(),
                     serviceStateRegistry = CollectorServiceStateRegistry(),
+                    sessionCalibrationHook = NoOpSessionCalibrationHook,
                     applicationScope = scope,
                 )
 
@@ -145,6 +149,8 @@ class PassiveCollectionCoordinatorTest {
         private val backing: MutableStateFlow<ActivityRecognitionSnapshot>,
     ) : ActivityRecognitionGateway {
         override val snapshot: StateFlow<ActivityRecognitionSnapshot> = backing.asStateFlow()
+
+        override fun ingestActivityRecognitionIntent(intent: Intent): Boolean = false
 
         override suspend fun startUpdates() {
             backing.value = backing.value.copy(updatesActive = true)
@@ -203,6 +209,15 @@ class PassiveCollectionCoordinatorTest {
         override suspend fun stopAndFlush() = Unit
     }
 
+    private object NoOpSessionCalibrationHook : SessionCalibrationHook {
+        override suspend fun onRecordingSessionEnded(
+            sessionId: Long,
+            endState: SessionState,
+            endedAtEpochMs: Long,
+            calibrationWorkflowEnabled: Boolean,
+        ) = Unit
+    }
+
     private class FakeSensorRecordingController : SensorRecordingController {
         override val uiState = MutableStateFlow(SensorRecordingUiState())
 
@@ -240,4 +255,5 @@ private fun effectiveOnboardingPassiveOn(): AppSettings =
         localCompactionEnabled = false,
         captureMinSpeedMps = 4.5f,
         debugModeEnabled = false,
+        calibrationWorkflowEnabled = false,
     )

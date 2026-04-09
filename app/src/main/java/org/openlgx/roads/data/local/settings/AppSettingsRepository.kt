@@ -30,4 +30,6 @@ interface AppSettingsRepository {
     suspend fun setCaptureMinSpeedMps(mps: Float)
 
     suspend fun setDebugModeEnabled(enabled: Boolean)
+
+    suspend fun setCalibrationWorkflowEnabled(enabled: Boolean)
 }

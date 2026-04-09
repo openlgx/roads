@@ -27,7 +27,7 @@ Key implementation notes:
 - Collector lifecycle states: `IDLE`, `ARMING`, `RECORDING`, `COOLDOWN`, `PAUSED_POLICY`, `DEGRADED` (`org.openlgx.roads.collector.lifecycle`)
 - Activity recognition uses Google Play services when available; the UI and Diagnostics surface support/permission/update state
 - Settings: passive toggle is persisted under DataStore key **`passive_collection_enabled`** (see `AppSettingsRepositoryImpl`)
-- Foreground service type: **`specialUse`** (see `AndroidManifest.xml`); notification permissions apply on Android 13+
+- Foreground recording uses **location**-type FGS (`CollectorForegroundService` in `AndroidManifest.xml`); notification permission applies on Android 13+
 - Debugging: enable **Debug mode** in Settings to reveal manual/simulation controls on Home
 
 When debugging compile/Hilt/Room issues, check the manifest, `PassiveCollectionCoordinator`, and `README` build commands first.
@@ -50,9 +50,17 @@ While the collector is **RECORDING** and the `CollectorForegroundService` is run
 - **Provenance**: `RecordingSessionEntity.sensorCaptureSnapshotJson` stores hardware availability, subscribed sensors, config snapshot, and degraded flags (accel/gyro required when enabled in config).
 - **UI**: Home and Diagnostics show availability, capture active flag, sample counts, last timestamps, estimated callback rate, and degraded IMU state.
 
+**Passive collection when the app is not in the foreground**
+
+- **Activity recognition** results are delivered to a **manifest-registered** receiver (`ActivityRecognitionUpdatesReceiver`), not only a dynamically registered one, so the process can be started or woken when Google Play Services has an update (for example after the task was removed from recents and the OS had killed the app).
+- **Device reboot**: `BootCompletedReceiver` handles `BOOT_COMPLETED` (with `RECEIVE_BOOT_COMPLETED`) so `RoadsApplication` / `PassiveCollectionHandle.start()` runs again and the coordinator can re-subscribe when passive collection is enabled.
+- **While recording**: Trip capture still relies on **`CollectorForegroundService`** (location-type FGS); users should see an ongoing notification during recording.
+- **Force stop** (Settings → Apps → *Force stop*): Android **does not** allow the app to restart background components until the user launches the app again. This is platform policy—not something the app can override.
+- **OEM battery restrictions**: For best results on aggressive devices, set the app’s battery usage to **Unrestricted** (wording varies by manufacturer).
+
 **Phase 2C (session inspection, local export, validation tooling)**
 
-Browse **Recorded sessions** from Home; each row opens **Session detail** with id/uuid, timing, source, sample counts, last GNSS/IMU timestamps, `sensorCaptureSnapshotJson` / `collectorStateSnapshotJson`, upload/quality placeholders, and lightweight **validation** (monotonic wall clocks, coarse gap heuristics, accel/gra presence, low-rate warning). **Export session** writes a versioned bundle under `<externalFiles>/olgx_exports/` (folder + sibling `.zip`): `session.json`, `manifest.json`, `location_samples.csv` + `.json`, `sensor_samples.csv` + `.json`. The manifest includes `exportSchemaVersion`, `exportMethodVersion`, disclaimer, embedded **device profile** (if a `device_profiles` row exists), and a **validationSummary** object. Diagnostics shows export root path, last export path/time/success/error, and DB-wide data-quality hints.
+Browse **Recorded sessions** from Home; each row opens **Session detail** with id/uuid, timing, source, sample counts, last GNSS/IMU timestamps, `sensorCaptureSnapshotJson` / `collectorStateSnapshotJson`, upload/quality placeholders, and lightweight **validation** (monotonic wall clocks, coarse gap heuristics, accel/gra presence, low-rate warning). **Export session** writes a versioned bundle under `<externalFiles>/olgx_exports/` (folder + sibling `.zip`): `session.json`, `manifest.json`, `location_samples.csv` + `.json`, `sensor_samples.csv` + `.json`. The manifest includes `exportSchemaVersion`, `exportMethodVersion`, disclaimer, embedded **device profile** (if a `device_profiles` row exists), **validationSummary**, and (schema v2+) **`calibrationWorkflowEnabled`** / **`calibrationLiteraturePointer`** reflecting Settings. Diagnostics shows export root path, last export path/time/success/error, and DB-wide data-quality hints.
 
 **Build / test (from repo root)**
 
@@ -62,7 +70,22 @@ Browse **Recorded sessions** from Home; each row opens **Session detail** with i
 | Signed release APK | `.\gradlew.bat :app:assembleRelease` (requires signing; see below) | `app\build\outputs\apk\release\app-release.apk` |
 | Unit tests | `.\gradlew.bat :app:testDebugUnitTest` | — |
 
-**Prerequisites:** Android SDK; JDK 17; `local.properties` with `sdk.dir` (Android Studio creates this on first open).
+**Prerequisites:** Android SDK; **JDK 17** (Android Studio’s bundled runtime is fine); `local.properties` with `sdk.dir` (Android Studio creates this on first open).
+
+**Windows — `JAVA_HOME is not set`:** Gradle needs `JAVA_HOME`. If you use Android Studio, point it at the bundled JBR for the current PowerShell session, then run `gradlew`:
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+.\gradlew.bat :app:testDebugUnitTest
+```
+
+Or use the wrapper script (probes the same path and sets `JAVA_HOME` if unset):
+
+```powershell
+.\scripts\run-gradle.ps1 :app:testDebugUnitTest
+```
+
+To persist for your user account: System Properties → Environment Variables → **User** `JAVA_HOME` = `C:\Program Files\Android\Android Studio\jbr` (adjust if Studio is installed elsewhere).
 
 **Emulator workflow (unchanged)**
 
@@ -296,6 +319,8 @@ Perform:
 - stationary / walking rejection
 - invalid GPS rejection
 
+**Confounders** (cornering vs pavement vs designed discontinuities): **[analysis/ROUGHNESS_CONFOUNDERS.md](analysis/ROUGHNESS_CONFOUNDERS.md)**; offline prototypes in **[analysis/roughness_lab/](analysis/roughness_lab/)**; future council geo masks: **[specs/geo_exclusion_mask.schema.json](specs/geo_exclusion_mask.schema.json)**.
+
 ### Phase C: windowing
 Group data into windows such as:
 
@@ -328,6 +353,8 @@ Later relate the proxy score to:
 - labelled reference road sections
 - known smooth/rough comparison roads
 - eventual profiler-derived IRI or accepted council condition labels
+
+Engineering background (standards, two calibration layers, literature): [docs/calibration-notes.md](docs/calibration-notes.md).
 
 ## Validation philosophy
 
@@ -407,3 +434,6 @@ specs/
   api/
   schema/
   road-segment-model/
+  geo_exclusion_mask.schema.json
+  examples/
+    exclusion_mask.example.geojson

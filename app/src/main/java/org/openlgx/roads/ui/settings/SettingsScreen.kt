@@ -129,6 +129,17 @@ fun SettingsScreen(
                 checked = settings.debugModeEnabled,
                 onCheckedChange = viewModel::setDebugMode,
             )
+
+            Text("Phase F — calibration workflow", style = MaterialTheme.typography.titleMedium)
+            SettingToggleRow(
+                title = "Record session-completed calibration anchors",
+                checked = settings.calibrationWorkflowEnabled,
+                onCheckedChange = viewModel::setCalibrationWorkflowEnabled,
+                supporting =
+                    "Experimental. When on, each completed recording session inserts a row in " +
+                        "calibration_runs (anchor only—not MEMS or IRI calibration). " +
+                        "Exports include calibration flags in manifest.json. See docs/calibration-notes.md.",
+            )
         }
     }
 }

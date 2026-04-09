@@ -64,4 +64,13 @@ class AppSettingsRepositoryTest {
             repo.setUploadAllowCellular(true)
             assertThat(repo.settings.first().uploadAllowCellular).isTrue()
         }
+
+    @Test
+    fun calibrationWorkflowDefaultsOffAndCanEnable() =
+        runBlocking {
+            val repo = createRepository()
+            assertThat(repo.settings.first().calibrationWorkflowEnabled).isFalse()
+            repo.setCalibrationWorkflowEnabled(true)
+            assertThat(repo.settings.first().calibrationWorkflowEnabled).isTrue()
+        }
 }

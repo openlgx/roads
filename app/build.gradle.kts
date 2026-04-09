@@ -42,11 +42,20 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "org.openlgx.roads"
+        val appId = "org.openlgx.roads"
+        applicationId = appId
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        val activityRecognitionUpdatesAction = "$appId.ACTION_ACTIVITY_RECOGNITION_UPDATES"
+        manifestPlaceholders["activityRecognitionUpdatesAction"] = activityRecognitionUpdatesAction
+        buildConfigField(
+            "String",
+            "ACTIVITY_RECOGNITION_UPDATES_ACTION",
+            "\"$activityRecognitionUpdatesAction\"",
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -64,6 +64,7 @@ class HomeViewModelTest {
                         localCompactionEnabled = false,
                         captureMinSpeedMps = 4.5f,
                         debugModeEnabled = false,
+                        calibrationWorkflowEnabled = false,
                     ),
                 )
 
@@ -91,6 +92,7 @@ class HomeViewModelTest {
                     localCompactionEnabled = false,
                     captureMinSpeedMps = 4.5f,
                     debugModeEnabled = false,
+                    calibrationWorkflowEnabled = false,
                 ),
             )
             advanceUntilIdle()
@@ -118,6 +120,7 @@ class HomeViewModelTest {
                         localCompactionEnabled = false,
                         captureMinSpeedMps = 4.5f,
                         debugModeEnabled = false,
+                        calibrationWorkflowEnabled = false,
                     ),
                 )
 
@@ -162,6 +165,7 @@ class HomeViewModelTest {
                         localCompactionEnabled = false,
                         captureMinSpeedMps = 4.5f,
                         debugModeEnabled = false,
+                        calibrationWorkflowEnabled = false,
                     ),
                 )
             val collector = FakePassiveCollectionHandle()

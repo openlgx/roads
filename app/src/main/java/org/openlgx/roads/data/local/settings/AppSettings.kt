@@ -22,4 +22,9 @@ data class AppSettings(
     val localCompactionEnabled: Boolean,
     val captureMinSpeedMps: Float,
     val debugModeEnabled: Boolean,
+    /**
+     * Phase F: when true, completed recording sessions insert optional `calibration_runs` anchor rows
+     * and exports include calibration metadata in the manifest.
+     */
+    val calibrationWorkflowEnabled: Boolean,
 )
