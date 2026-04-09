@@ -29,6 +29,7 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onOpenSettings: () -> Unit,
     onOpenDiagnostics: () -> Unit,
+    onOpenSessions: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val collector = state.collector
@@ -50,10 +51,17 @@ fun HomeScreen(
             true
         }
 
+    val fineLocationGranted =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+
     val arLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* refresh via vm */ }
 
     val notifLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* refresh via vm */ }
+
+    val fineLocationLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { /* refresh via vm */ }
 
     Scaffold(
@@ -100,6 +108,56 @@ fun HomeScreen(
             )
             Text("Foreground service running: ${collector.foregroundServiceRunning}", style = MaterialTheme.typography.bodyMedium)
 
+            Text("Recording (Phase 2B1)", style = MaterialTheme.typography.titleMedium)
+            Text("Recording sessions (DB count): ${state.recordingSessionCount}", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Location: published samples≈${state.locationRecording.publishedSampleCount}, " +
+                    "buffered=${state.locationRecording.bufferedSampleCount}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "Last location time (epoch ms): ${state.locationRecording.lastWallClockEpochMs ?: "—"}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "Last speed (m/s): ${state.locationRecording.lastSpeedMps?.toString() ?: "—"}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            Text("IMU / motion (Phase 2B2)", style = MaterialTheme.typography.titleMedium)
+            val s = state.sensorRecording
+            Text(
+                "Sensor capture active: ${s.recordingSensors} (degraded=${s.degradedRecording})",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (s.degradedReason != null) {
+                Text("Sensor degraded: ${s.degradedReason}", style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                "Hardware OK — accel=${s.hardwareAvailable.accelerometer}, gyro=${s.hardwareAvailable.gyroscope}, " +
+                    "gravity=${s.hardwareAvailable.gravity}, linear=${s.hardwareAvailable.linearAcceleration}, " +
+                    "rotVec=${s.hardwareAvailable.rotationVector}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Subscribed this session — accel=${s.enabledSubscribed.accelerometer}, gyro=${s.enabledSubscribed.gyroscope}, " +
+                    "gravity=${s.enabledSubscribed.gravity}, linear=${s.enabledSubscribed.linearAcceleration}, " +
+                    "rotVec=${s.enabledSubscribed.rotationVector}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Sensor samples (published≈${s.publishedSampleCount}, buffered=${s.bufferedSampleCount})",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "Last sensor time (epoch ms): ${s.lastWallClockEpochMs ?: "—"}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "Est. callbacks/sec (flush window): ${s.estimatedCallbacksPerSecond?.toString() ?: "—"}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+
             Text("Permissions", style = MaterialTheme.typography.titleMedium)
             Text("Activity recognition granted: $activityRecognitionGranted", style = MaterialTheme.typography.bodyMedium)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -109,6 +167,13 @@ fun HomeScreen(
                 ) {
                     Text("Request activity recognition permission")
                 }
+            }
+            Text("Fine location granted: $fineLocationGranted", style = MaterialTheme.typography.bodyMedium)
+            Button(
+                onClick = { fineLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION) },
+                enabled = state.passiveCollectionEffective && !fineLocationGranted,
+            ) {
+                Text("Request fine location permission")
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 Text("Notifications granted: $notificationsGranted", style = MaterialTheme.typography.bodyMedium)
@@ -156,6 +221,9 @@ fun HomeScreen(
             }
             Button(onClick = onOpenDiagnostics) {
                 Text("Diagnostics")
+            }
+            Button(onClick = onOpenSessions) {
+                Text("Recorded sessions")
             }
         }
     }

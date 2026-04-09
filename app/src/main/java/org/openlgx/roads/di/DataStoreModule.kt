@@ -34,4 +34,19 @@ object DataStoreModule {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             produceFile = { context.preferencesDataStoreFile("app_settings") },
         )
+
+    @Provides
+    @Singleton
+    @ExportDiagnosticsDataStore
+    fun provideExportDiagnosticsDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> =
+        PreferenceDataStoreFactory.create(
+            corruptionHandler =
+                ReplaceFileCorruptionHandler(
+                    produceNewData = { emptyPreferences() },
+                ),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            produceFile = { context.preferencesDataStoreFile("export_diagnostics") },
+        )
 }

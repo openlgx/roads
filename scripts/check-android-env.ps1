@@ -103,6 +103,86 @@ function Get-AndroidEnvironmentInfo {
     return [pscustomobject]$info
 }
 
+function Get-AndroidAdbOnlyEnvironmentInfo {
+    <#
+    .SYNOPSIS
+      Resolve adb + gradlew for physical-device workflows (no emulator required).
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    $info = [ordered]@{
+        Ok         = $true
+        RepoRoot   = $RepoRoot
+        SdkRoot    = $null
+        AdbPath    = $null
+        GradlewBat = $null
+        Missing    = New-Object System.Collections.Generic.List[string]
+        Warnings   = New-Object System.Collections.Generic.List[string]
+    }
+
+    $candidates = Get-AndroidSdkRootCandidates
+    foreach ($sdk in $candidates) {
+        $adb = Join-Path $sdk "platform-tools\adb.exe"
+        if (Test-Path -LiteralPath $adb) {
+            $info.SdkRoot = $sdk
+            $info.AdbPath = $adb
+            break
+        }
+    }
+
+    if (-not $info.AdbPath) {
+        $info.Ok = $false
+        [void]$info.Missing.Add("adb.exe not found (install Android SDK Platform-Tools; set ANDROID_HOME if needed)")
+    }
+
+    $gradlewBat = Join-Path $RepoRoot "gradlew.bat"
+    if (-not (Test-Path -LiteralPath $gradlewBat)) {
+        $info.Ok = $false
+        [void]$info.Missing.Add("gradlew.bat not found at repo root: $gradlewBat")
+    }
+    $info.GradlewBat = $gradlewBat
+
+    $javaHome = $env:JAVA_HOME
+    if ([string]::IsNullOrWhiteSpace($javaHome)) {
+        [void]$info.Warnings.Add("JAVA_HOME is not set. Gradle may still work if Java is on PATH.")
+    } elseif (-not (Test-Path -LiteralPath (Join-Path $javaHome "bin\java.exe"))) {
+        [void]$info.Warnings.Add("JAVA_HOME is set but bin\java.exe was not found under: $javaHome")
+    }
+
+    return [pscustomobject]$info
+}
+
+function Write-AndroidAdbOnlyReport {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Info
+    )
+
+    Write-Host ""
+    Write-DevLog "INFO" "ADB / Gradle check (physical device workflow)"
+    Write-DevLog "INFO" "Repo root: $($Info.RepoRoot)"
+    if ($Info.SdkRoot) {
+        Write-DevLog "OK" "ANDROID SDK: $($Info.SdkRoot)"
+        Write-DevLog "OK" "adb: $($Info.AdbPath)"
+    }
+    if ($Info.GradlewBat -and (Test-Path -LiteralPath $Info.GradlewBat)) {
+        Write-DevLog "OK" "gradlew.bat: $($Info.GradlewBat)"
+    }
+    foreach ($w in $Info.Warnings) {
+        Write-DevLog "WARN" $w
+    }
+    if ($Info.Missing.Count -gt 0) {
+        foreach ($m in $Info.Missing) {
+            Write-DevLog "ERROR" $m
+        }
+        Write-DevLog "INFO" "See: docs/android-real-device-testing.md"
+        Write-Host ""
+    }
+}
+
 function Write-AndroidEnvironmentReport {
     param(
         [Parameter(Mandatory = $true)]

@@ -16,10 +16,11 @@ constructor(
 
     private val appContext = context.applicationContext
 
-    override fun startCollectorService() {
+    override fun startCollectorService(sessionId: Long) {
         val intent =
             Intent(appContext, CollectorForegroundService::class.java).apply {
                 action = CollectorForegroundService.ACTION_START
+                putExtra(CollectorForegroundService.EXTRA_SESSION_ID, sessionId)
             }
         ContextCompat.startForegroundService(appContext, intent)
     }

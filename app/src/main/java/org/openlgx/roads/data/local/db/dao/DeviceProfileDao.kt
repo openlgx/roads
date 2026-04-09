@@ -14,4 +14,7 @@ interface DeviceProfileDao {
 
     @Query("SELECT COUNT(*) FROM device_profiles")
     suspend fun count(): Long
+
+    @Query("SELECT * FROM device_profiles ORDER BY id ASC LIMIT 1")
+    suspend fun firstOrNull(): DeviceProfileEntity?
 }

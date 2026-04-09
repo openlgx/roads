@@ -9,6 +9,7 @@ data class PassiveCollectionUiModel(
     val activityRecognitionSupported: Boolean = false,
     val activityRecognitionUpdatesActive: Boolean = false,
     val activityRecognitionPermissionGranted: Boolean = false,
+    val fineLocationPermissionGranted: Boolean = false,
     val lastActivityType: Int = 0,
     val lastActivityConfidence: Int = 0,
     val lastActivityLabel: String = "—",

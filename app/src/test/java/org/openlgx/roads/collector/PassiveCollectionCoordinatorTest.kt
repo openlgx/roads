@@ -1,14 +1,15 @@
 package org.openlgx.roads.collector
 
 import android.content.Context
-import com.google.android.gms.location.DetectedActivity
 import androidx.test.core.app.ApplicationProvider
+import com.google.android.gms.location.DetectedActivity
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -23,11 +24,17 @@ import org.openlgx.roads.MainDispatcherRule
 import org.openlgx.roads.activityrecognition.ActivityRecognitionGateway
 import org.openlgx.roads.activityrecognition.ActivityRecognitionSnapshot
 import org.openlgx.roads.collector.lifecycle.CollectorLifecycleState
-import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.local.db.model.SessionState
+import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.repo.AutoRecordingSessionStartParams
 import org.openlgx.roads.data.repo.RecordingSessionRepository
+import org.openlgx.roads.location.ArmingDrivingGate
+import org.openlgx.roads.location.LocationRecordingController
+import org.openlgx.roads.location.LocationRecordingUiState
+import org.openlgx.roads.sensor.SensorRecordingController
+import org.openlgx.roads.sensor.SensorRecordingUiState
 import org.openlgx.roads.permission.ActivityRecognitionPermissionChecker
+import org.openlgx.roads.permission.FineLocationPermissionChecker
 import org.openlgx.roads.service.CollectorForegroundServiceController
 import org.openlgx.roads.service.CollectorServiceStateRegistry
 import org.robolectric.RobolectricTestRunner
@@ -60,10 +67,15 @@ class PassiveCollectionCoordinatorTest {
                     recordingSessionRepository = FakeRecordingSessionRepository(),
                     foregroundServiceController = FakeForegroundServiceController(),
                     permissionChecker =
-                        FakePermissionChecker(
+                        FakeArPermissionChecker(
                             context = ApplicationProvider.getApplicationContext(),
                             granted = true,
                         ),
+                    fineLocationPermissionChecker =
+                        AlwaysFineLocation(ApplicationProvider.getApplicationContext()),
+                    armingDrivingGate = ArmingDrivingGate { _: Float -> true },
+                    locationRecordingController = FakeLocationRecordingController(),
+                    sensorRecordingController = FakeSensorRecordingController(),
                     serviceStateRegistry = CollectorServiceStateRegistry(),
                     applicationScope = scope,
                 )
@@ -102,10 +114,15 @@ class PassiveCollectionCoordinatorTest {
                     recordingSessionRepository = repo,
                     foregroundServiceController = fg,
                     permissionChecker =
-                        FakePermissionChecker(
+                        FakeArPermissionChecker(
                             context = ApplicationProvider.getApplicationContext(),
                             granted = true,
                         ),
+                    fineLocationPermissionChecker =
+                        AlwaysFineLocation(ApplicationProvider.getApplicationContext()),
+                    armingDrivingGate = ArmingDrivingGate { _: Float -> true },
+                    locationRecordingController = FakeLocationRecordingController(),
+                    sensorRecordingController = FakeSensorRecordingController(),
                     serviceStateRegistry = CollectorServiceStateRegistry(),
                     applicationScope = scope,
                 )
@@ -121,6 +138,7 @@ class PassiveCollectionCoordinatorTest {
             assertEquals(CollectorLifecycleState.RECORDING, coordinator.uiState.value.lifecycleState)
             assertEquals(1L, coordinator.uiState.value.activeSessionId)
             assertEquals(1, fg.starts)
+            assertEquals(1L, fg.lastSessionId)
         }
 
     private class FakeActivityGateway(
@@ -144,6 +162,11 @@ class PassiveCollectionCoordinatorTest {
             return id
         }
 
+        override suspend fun updateSensorCaptureSnapshot(
+            sessionId: Long,
+            json: String?,
+        ) = Unit
+
         override suspend fun endRecordingSession(
             sessionId: Long,
             endedAtEpochMs: Long,
@@ -153,14 +176,18 @@ class PassiveCollectionCoordinatorTest {
         override suspend fun countSessions(): Long = 0L
 
         override suspend fun findOpenSessionId(): Long? = null
+
+        override fun observeRecordingSessionCount() = flowOf(0L)
     }
 
     private class FakeForegroundServiceController : CollectorForegroundServiceController {
         var starts: Int = 0
         var stops: Int = 0
+        var lastSessionId: Long = -1L
 
-        override fun startCollectorService() {
+        override fun startCollectorService(sessionId: Long) {
             starts++
+            lastSessionId = sessionId
         }
 
         override fun stopCollectorService() {
@@ -168,11 +195,33 @@ class PassiveCollectionCoordinatorTest {
         }
     }
 
-    private class FakePermissionChecker(
+    private class FakeLocationRecordingController : LocationRecordingController {
+        override val uiState = MutableStateFlow(LocationRecordingUiState())
+
+        override fun startRecording(sessionId: Long) = Unit
+
+        override suspend fun stopAndFlush() = Unit
+    }
+
+    private class FakeSensorRecordingController : SensorRecordingController {
+        override val uiState = MutableStateFlow(SensorRecordingUiState())
+
+        override fun startRecording(sessionId: Long) = Unit
+
+        override suspend fun stopAndFlush() = Unit
+    }
+
+    private class FakeArPermissionChecker(
         context: Context,
         private val granted: Boolean,
     ) : ActivityRecognitionPermissionChecker(context) {
         override fun isGranted(): Boolean = granted
+    }
+
+    private class AlwaysFineLocation(
+        context: Context,
+    ) : FineLocationPermissionChecker(context) {
+        override fun isGranted(): Boolean = true
     }
 }
 

@@ -26,6 +26,8 @@ data class RecordingSessionEntity(
     val autoDetectionSnapshotJson: String? = null,
     /** Runtime collector lifecycle / activity snapshot at session start (Phase 2A). */
     val collectorStateSnapshotJson: String? = null,
+    /** IMU / motion sensor availability + enablement snapshot (Phase 2B2), updated when capture arms. */
+    val sensorCaptureSnapshotJson: String? = null,
     val roadEligibilitySummaryJson: String? = null,
     /** Snapshot of capture policy at session start (passive gate, etc.). */
     val capturePassiveCollectionEnabled: Boolean? = null,

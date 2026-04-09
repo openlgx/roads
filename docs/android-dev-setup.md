@@ -122,6 +122,10 @@ The script sets **`ANDROID_SERIAL`** to the first `emulator-*` device it finds s
 - **Implemented:** `-LaunchApp` uses `adb shell monkey -p <applicationId> -c android.intent.category.LAUNCHER 1` with `<applicationId>` parsed from `app/build.gradle.kts`.
 - If parsing fails, the script logs a warning and skips launch.
 
+## Physical Android phones (sideload)
+
+For **USB / manual APK install** on real devices—without the Play Store—see [android-real-device-testing.md](android-real-device-testing.md) and [android-release-signing.md](android-release-signing.md).
+
 ## Security note: ExecutionPolicy
 
 If PowerShell blocks scripts, run **once per session**:

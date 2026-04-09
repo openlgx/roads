@@ -24,7 +24,11 @@ import org.openlgx.roads.data.local.db.model.SessionState
 import org.openlgx.roads.data.repo.AutoRecordingSessionStartParams
 import org.openlgx.roads.data.repo.RecordingSessionRepository
 import org.openlgx.roads.di.ApplicationScope
+import org.openlgx.roads.location.ArmingDrivingGate
+import org.openlgx.roads.location.LocationRecordingController
+import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.permission.ActivityRecognitionPermissionChecker
+import org.openlgx.roads.permission.FineLocationPermissionChecker
 import org.openlgx.roads.service.CollectorForegroundServiceController
 import org.openlgx.roads.service.CollectorServiceStateRegistry
 import timber.log.Timber
@@ -38,6 +42,10 @@ constructor(
     private val recordingSessionRepository: RecordingSessionRepository,
     private val foregroundServiceController: CollectorForegroundServiceController,
     private val permissionChecker: ActivityRecognitionPermissionChecker,
+    private val fineLocationPermissionChecker: FineLocationPermissionChecker,
+    private val armingDrivingGate: ArmingDrivingGate,
+    private val locationRecordingController: LocationRecordingController,
+    private val sensorRecordingController: SensorRecordingController,
     private val serviceStateRegistry: CollectorServiceStateRegistry,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) : PassiveCollectionHandle {
@@ -237,7 +245,10 @@ constructor(
                 if (likelyDriving) {
                     cancelDeferredJobs()
                     lifecycleState = CollectorLifecycleState.RECORDING
-                    foregroundServiceController.startCollectorService()
+                    val sid = activeSessionId
+                    if (sid != null) {
+                        foregroundServiceController.startCollectorService(sid)
+                    }
                 }
             }
 
@@ -280,6 +291,17 @@ constructor(
             publishUi()
             return
         }
+
+        val gateOk =
+            when (debugDrivingOverride) {
+                true -> true
+                else -> armingDrivingGate.passesLikelyDrivingGate(settings.captureMinSpeedMps)
+            }
+        if (!gateOk) {
+            lifecycleState = CollectorLifecycleState.IDLE
+            publishUi()
+            return
+        }
         enterRecordingFromArming(settings)
     }
 
@@ -293,6 +315,7 @@ constructor(
             AutoRecordingSessionStartParams(
                 armedAtEpochMs = armedAt,
                 recordingStartedAtEpochMs = now,
+                recordingSource = RecordingSource.AUTO,
                 collectorStateSnapshotJson = json,
                 capturePassiveCollectionEnabled = settings.passiveCollectionEffective,
                 uploadPolicyWifiOnly = settings.uploadWifiOnly,
@@ -305,7 +328,7 @@ constructor(
         activeSessionId = id
         lifecycleState = CollectorLifecycleState.RECORDING
         armingStartedAtEpochMs = null
-        foregroundServiceController.startCollectorService()
+        foregroundServiceController.startCollectorService(id)
         publishUi(settings, snap, permissionChecker.isGranted(), snap.updatesActive, true, true)
     }
 
@@ -341,7 +364,7 @@ constructor(
         val id = recordingSessionRepository.beginAutoRecordingSession(params)
         activeSessionId = id
         lifecycleState = CollectorLifecycleState.RECORDING
-        foregroundServiceController.startCollectorService()
+        foregroundServiceController.startCollectorService(id)
         publishUi()
     }
 
@@ -358,8 +381,10 @@ constructor(
 
     private suspend fun onCooldownComplete() {
         if (lifecycleState != CollectorLifecycleState.COOLDOWN) return
-        val settings = lastSettings ?: return
+        if (lastSettings == null) return
         val sid = activeSessionId
+        locationRecordingController.stopAndFlush()
+        sensorRecordingController.stopAndFlush()
         activeSessionId = null
         lifecycleState = CollectorLifecycleState.IDLE
         cooldownJob = null
@@ -374,8 +399,13 @@ constructor(
         publishUi()
     }
 
-    private suspend fun endActiveSessionIfNeeded(settings: AppSettings, endState: SessionState) {
+    private suspend fun endActiveSessionIfNeeded(
+        @Suppress("UNUSED_PARAMETER") settings: AppSettings,
+        endState: SessionState,
+    ) {
         val sid = activeSessionId
+        locationRecordingController.stopAndFlush()
+        sensorRecordingController.stopAndFlush()
         if (sid == null) {
             foregroundServiceController.stopCollectorService()
             return
@@ -425,6 +455,7 @@ constructor(
         }
 
         val fg = serviceStateRegistry.foregroundRunning.value
+        val fineLoc = fineLocationPermissionChecker.isGranted()
         val recording = lifecycleState == CollectorLifecycleState.RECORDING
         val likely =
             when (debugDrivingOverride) {
@@ -441,6 +472,7 @@ constructor(
                 activityRecognitionSupported = arOk,
                 activityRecognitionUpdatesActive = updatesActive,
                 activityRecognitionPermissionGranted = perm,
+                fineLocationPermissionGranted = fineLoc,
                 lastActivityType = snap.lastDetectedActivityType,
                 lastActivityConfidence = snap.lastConfidence,
                 lastActivityLabel = label,

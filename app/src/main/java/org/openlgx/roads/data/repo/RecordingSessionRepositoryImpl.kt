@@ -3,6 +3,7 @@ package org.openlgx.roads.data.repo
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
 import org.openlgx.roads.data.local.db.RoadsDatabase
 import org.openlgx.roads.data.local.db.entity.RecordingSessionEntity
 import org.openlgx.roads.data.local.db.model.RecordingSource
@@ -39,6 +40,13 @@ constructor(
         return database.recordingSessionDao().insert(entity)
     }
 
+    override suspend fun updateSensorCaptureSnapshot(
+        sessionId: Long,
+        json: String?,
+    ) {
+        database.recordingSessionDao().updateSensorCaptureSnapshot(sessionId, json)
+    }
+
     override suspend fun endRecordingSession(
         sessionId: Long,
         endedAtEpochMs: Long,
@@ -51,4 +59,7 @@ constructor(
 
     override suspend fun findOpenSessionId(): Long? =
         database.recordingSessionDao().findOpenSession()?.id
+
+    override fun observeRecordingSessionCount(): Flow<Long> =
+        database.recordingSessionDao().observeRecordingSessionCount()
 }

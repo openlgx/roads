@@ -5,4 +5,5 @@
     <string name="collector_notification_channel_description">Shows when a passive recording session is active (Phase 2A skeleton).</string>
     <string name="collector_notification_title">OLGX Roads collector</string>
     <string name="collector_notification_body">Passive lifecycle active (no continuous sensors yet).</string>
+    <string name="collector_notification_body_location">Recording location for an active session (Phase 2B1).</string>
 </resources>

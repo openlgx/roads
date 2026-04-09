@@ -5,6 +5,9 @@ build/
 
 # Android / IDE
 local.properties
+keystore.properties
+*.jks
+*.keystore
 *.iml
 .idea/
 .DS_Store

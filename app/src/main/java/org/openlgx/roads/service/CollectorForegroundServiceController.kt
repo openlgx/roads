@@ -1,7 +1,7 @@
 package org.openlgx.roads.service
 
 interface CollectorForegroundServiceController {
-    fun startCollectorService()
+    fun startCollectorService(sessionId: Long)
 
     fun stopCollectorService()
 }

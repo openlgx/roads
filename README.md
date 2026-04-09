@@ -32,22 +32,66 @@ Key implementation notes:
 
 When debugging compile/Hilt/Room issues, check the manifest, `PassiveCollectionCoordinator`, and `README` build commands first.
 
+**Phase 2B1 (fused GNSS capture in passive recording)**
+
+End-to-end passive **RECORDING** now creates a `RecordingSession` (source **`AUTO`** for the normal passive path), starts **fused** location updates under a **foreground service of type `location`** (`CollectorForegroundService`), and persists batched rows to `location_samples` (elapsed realtime, UTC time, lat/lon, speed, bearing, accuracy, altitude when present; eligibility placeholders retained).
+
+- **Arming gate**: Before leaving `ARMING`, the app requires a fused **speed** fix at or above Settings → capture min speed (high-accuracy current location call). Debug “simulate driving” still skips this gate so local testing stays easy.
+- **Lifecycle**: `PassiveCollectionCoordinator` stops/flushes `SessionLocationRecorder` before finalizing the Room session row (complete / interrupt / policy abort). `SESSION` upload state remains `NOT_QUEUED` until a later upload phase.
+- **Permissions**: `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`, `FOREGROUND_SERVICE_LOCATION`, plus existing AR + notifications as needed.
+
+**Phase 2B2 (IMU / motion capture in the same recording session)**
+
+While the collector is **RECORDING** and the `CollectorForegroundService` is running, the app also captures **raw** motion samples into `sensor_samples`, sharing the same `RecordingSession` as GNSS (no separate sensor-only sessions).
+
+- **Architecture**: `SensorGateway` + `SystemSensorGateway` (`SensorManager`) with explicit `SensorAvailabilitySnapshot`; `SensorCaptureConfig` controls delay, batch size, flush interval, and which sensor types to enable. Default **`enableRotationVector` is false** (persist full quaternion later if needed; `SensorSampleEntity.w` is ready).
+- **Pipeline**: `SessionSensorRecorder` (`SensorRecordingController`) listens on a dedicated **HandlerThread**, buffers `SensorSampleEntity` rows in memory, and flushes via **`insertAll`** on a timer, when the buffer is full, on **batch signals**, and on **stop** (no per-callback DB I/O).
+- **Lifecycle**: `SensorRecordingController.startRecording(sessionId)` / `stopAndFlush()` mirror location; called from `CollectorForegroundService` alongside `LocationRecordingController`; `PassiveCollectionCoordinator` invokes `sensorRecordingController.stopAndFlush()` whenever it stops location before ending a session.
+- **Provenance**: `RecordingSessionEntity.sensorCaptureSnapshotJson` stores hardware availability, subscribed sensors, config snapshot, and degraded flags (accel/gyro required when enabled in config).
+- **UI**: Home and Diagnostics show availability, capture active flag, sample counts, last timestamps, estimated callback rate, and degraded IMU state.
+
+**Phase 2C (session inspection, local export, validation tooling)**
+
+Browse **Recorded sessions** from Home; each row opens **Session detail** with id/uuid, timing, source, sample counts, last GNSS/IMU timestamps, `sensorCaptureSnapshotJson` / `collectorStateSnapshotJson`, upload/quality placeholders, and lightweight **validation** (monotonic wall clocks, coarse gap heuristics, accel/gra presence, low-rate warning). **Export session** writes a versioned bundle under `<externalFiles>/olgx_exports/` (folder + sibling `.zip`): `session.json`, `manifest.json`, `location_samples.csv` + `.json`, `sensor_samples.csv` + `.json`. The manifest includes `exportSchemaVersion`, `exportMethodVersion`, disclaimer, embedded **device profile** (if a `device_profiles` row exists), and a **validationSummary** object. Diagnostics shows export root path, last export path/time/success/error, and DB-wide data-quality hints.
+
 **Build / test (from repo root)**
 
-- Debug APK: `.\gradlew.bat :app:assembleDebug` (Windows) or `./gradlew :app:assembleDebug` (Unix)
-- Unit tests: `.\gradlew.bat :app:testDebugUnitTest`
+| Goal | Command | APK output |
+|------|---------|------------|
+| Debug APK | `.\gradlew.bat :app:assembleDebug` | `app\build\outputs\apk\debug\app-debug.apk` |
+| Signed release APK | `.\gradlew.bat :app:assembleRelease` (requires signing; see below) | `app\build\outputs\apk\release\app-release.apk` |
+| Unit tests | `.\gradlew.bat :app:testDebugUnitTest` | — |
 
 **Prerequisites:** Android SDK; JDK 17; `local.properties` with `sdk.dir` (Android Studio creates this on first open).
 
-**Run on Android emulator (command line, Windows-first)**
+**Emulator workflow (unchanged)**
 
 - Full setup and troubleshooting: [docs/android-dev-setup.md](docs/android-dev-setup.md)
 - Environment check: `.\scripts\check-android-env.ps1`
 - Install debug build on an AVD and optionally launch the app:
 
-  `.\scripts\dev-android.ps1 -Avd "YOUR_AVD_NAME" -LaunchApp`
+  ```powershell
+  .\scripts\dev-android.ps1 -Avd "YOUR_AVD_NAME" -LaunchApp
+  ```
 
   (`scripts\dev-android.bat` is a thin wrapper that calls the same PowerShell script.)
+
+**Real phone workflow (APK sideload, no Play Store)**
+
+- Guide: [docs/android-real-device-testing.md](docs/android-real-device-testing.md)
+- Local release signing only (no secrets in git): [docs/android-release-signing.md](docs/android-release-signing.md)
+
+```powershell
+.\scripts\build-debug-apk.ps1
+.\scripts\install-debug-apk.ps1 -LaunchApp
+
+.\scripts\build-release-apk.ps1
+.\scripts\install-release-apk.ps1 -LaunchApp
+
+.\scripts\list-android-devices.ps1
+```
+
+Signed **release** builds fail fast if signing is not configured. Use `keystore.properties` (copy from `keystore.properties.example`) or `ROADS_STORE_FILE`, `ROADS_STORE_PASSWORD`, `ROADS_KEY_ALIAS`, `ROADS_KEY_PASSWORD`.
 
 ## Vision
 

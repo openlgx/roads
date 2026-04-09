@@ -122,6 +122,53 @@ fun DiagnosticsScreen(
                     Text(
                         "Placeholder recording_sessions row count: ${snap.tableCounts.recordingSessions}",
                     )
+                    Text("Fine location permission: ${snap.collectorRuntime.fineLocationPermissionGranted}")
+                    Text(
+                        "Location samples (open session): ${snap.collectorRuntime.activeSessionLocationSamples}",
+                    )
+                    Text(
+                        "Last location epoch ms: ${snap.collectorRuntime.lastLocationWallClockEpochMs ?: "—"}",
+                    )
+                    Text(
+                        "Last location speed (m/s): ${snap.collectorRuntime.lastLocationSpeedMps ?: "—"}",
+                    )
+
+                    Text("Motion / IMU (Phase 2B2)", style = MaterialTheme.typography.titleMedium)
+                    val imu = snap.sensorRuntime
+                    Text("Sensor capture active: ${imu.captureActive}")
+                    Text(
+                        "Hardware — accel=${imu.hardwareAvailable.accelerometer}, gyro=${imu.hardwareAvailable.gyroscope}, " +
+                            "gravity=${imu.hardwareAvailable.gravity}, linear=${imu.hardwareAvailable.linearAcceleration}, " +
+                            "rotVec=${imu.hardwareAvailable.rotationVector}",
+                    )
+                    Text("Active session (UI): ${imu.activeSessionId ?: "—"}")
+                    Text("Samples (open session, best of DB vs UI): ${imu.activeSessionSampleCount}")
+                    Text("Buffered (UI): ${imu.bufferedSampleCount}")
+                    Text("Last sensor wall ms: ${imu.lastSensorWallClockEpochMs ?: "—"}")
+                    Text("Est. callbacks/sec: ${imu.estimatedCallbacksPerSecond ?: "—"}")
+                    Text("Degraded: ${imu.degradedRecording} — ${imu.degradedReason ?: "—"}")
+
+                    Text("Exports (Phase 2C)", style = MaterialTheme.typography.titleMedium)
+                    Text("Export root (app external files): ${snap.exportRootDirectory}")
+                    Text("Last export time (epoch ms): ${snap.exportDiagnostics.lastExportEpochMs ?: "—"}")
+                    Text("Last export success: ${snap.exportDiagnostics.lastExportSuccess}")
+                    Text("Last exported session id: ${snap.exportDiagnostics.lastExportedSessionId ?: "—"}")
+                    Text("Last export folder: ${snap.exportDiagnostics.lastExportDirectoryPath ?: "—"}")
+                    Text("Last export zip: ${snap.exportDiagnostics.lastExportZipPath ?: "—"}")
+                    Text("Last export error: ${snap.exportDiagnostics.lastExportError ?: "—"}")
+                    Text(
+                        "Sessions in DB: ${snap.tableCounts.recordingSessions} — " +
+                            "locations: ${snap.tableCounts.locationSamples}, " +
+                            "sensors: ${snap.tableCounts.sensorSamples}",
+                    )
+                    if (snap.dataQualityWarnings.isEmpty()) {
+                        Text("Data quality warnings: none")
+                    } else {
+                        Text("Data quality warnings:")
+                        snap.dataQualityWarnings.forEach { w ->
+                            Text("• $w", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
 
                     Text("Last upload summary: ${snap.lastUploadSummaryPlaceholder}")
 
