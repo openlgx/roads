@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -35,8 +36,8 @@ data class HomeUiState(
 class HomeViewModel
 @Inject
 constructor(
-    appSettingsRepository: AppSettingsRepository,
-    private val     passiveCollection: PassiveCollectionHandle,
+    private val appSettingsRepository: AppSettingsRepository,
+    private val passiveCollection: PassiveCollectionHandle,
     locationRecordingController: LocationRecordingController,
     sensorRecordingController: SensorRecordingController,
     recordingSessionRepository: RecordingSessionRepository,
@@ -68,6 +69,30 @@ constructor(
             started = SharingStarted.Eagerly,
             initialValue = HomeUiState(),
         )
+
+    /**
+     * Field-testing path: ensures the user toggle is on, marks onboarding complete, and persists via DataStore.
+     * Coordinator picks up [AppSettings.passiveCollectionEffective] on the next reconcile.
+     */
+    fun activatePassiveCollectionAndCompleteOnboarding() {
+        viewModelScope.launch {
+            appSettingsRepository.setPassiveCollectionEnabled(true)
+            appSettingsRepository.completeOnboarding()
+        }
+    }
+
+    /** Marks onboarding complete without forcing the passive toggle (for debug parity with Settings). */
+    fun completeOnboardingOnly() {
+        viewModelScope.launch {
+            appSettingsRepository.completeOnboarding()
+        }
+    }
+
+    fun resetOnboardingForDebug() {
+        viewModelScope.launch {
+            appSettingsRepository.setOnboardingCompleted(false)
+        }
+    }
 
     fun debugSetSimulatedDriving(active: Boolean?) {
         passiveCollection.debugSetSimulateDriving(active)

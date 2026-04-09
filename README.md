@@ -91,6 +91,14 @@ Browse **Recorded sessions** from Home; each row opens **Session detail** with i
 .\scripts\list-android-devices.ps1
 ```
 
+**Temporary Home activation (field testing)**  
+Until a full onboarding flow ships, **Home** includes:
+
+- A **Finish setup** card when onboarding is incomplete; **Complete onboarding & enable passive collection** writes to DataStore (`onboarding_completed` and ensures `passive_collection_enabled` is on).
+- A **Passive collection status** card: onboarding, user toggle, effective passive, required runtime permissions, and whether the **AR pipeline is listening** (`activityRecognitionUpdatesActive` while passive is effective).
+- **Permission** actions for activity recognition (Android 10+), fine location, and post notifications (Android 13+). They are available **before** onboarding so you can grant in any order; with **Debug mode** on (Settings), those buttons stay tappable for re-request attempts.
+- **Debug tools** (Debug mode): complete or reset onboarding, simulate driving, force recording, reset collector state.
+
 Signed **release** builds fail fast if signing is not configured. Use `keystore.properties` (copy from `keystore.properties.example`) or `ROADS_STORE_FILE`, `ROADS_STORE_PASSWORD`, `ROADS_KEY_ALIAS`, `ROADS_KEY_PASSWORD`.
 
 ## Vision
