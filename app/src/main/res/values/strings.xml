@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OLGX Roads</string>
+    <string name="collector_notification_channel_name">Passive collector</string>
+    <string name="collector_notification_channel_description">Shows when a passive recording session is active (Phase 2A skeleton).</string>
+    <string name="collector_notification_title">OLGX Roads collector</string>
+    <string name="collector_notification_body">Passive lifecycle active (no continuous sensors yet).</string>
+</resources>

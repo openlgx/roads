@@ -1,0 +1,194 @@
+package org.openlgx.roads.collector
+
+import android.content.Context
+import com.google.android.gms.location.DetectedActivity
+import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.openlgx.roads.FakeAppSettingsRepository
+import org.openlgx.roads.MainDispatcherRule
+import org.openlgx.roads.activityrecognition.ActivityRecognitionGateway
+import org.openlgx.roads.activityrecognition.ActivityRecognitionSnapshot
+import org.openlgx.roads.collector.lifecycle.CollectorLifecycleState
+import org.openlgx.roads.data.local.settings.AppSettings
+import org.openlgx.roads.data.local.db.model.SessionState
+import org.openlgx.roads.data.repo.AutoRecordingSessionStartParams
+import org.openlgx.roads.data.repo.RecordingSessionRepository
+import org.openlgx.roads.permission.ActivityRecognitionPermissionChecker
+import org.openlgx.roads.service.CollectorForegroundServiceController
+import org.openlgx.roads.service.CollectorServiceStateRegistry
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
+class PassiveCollectionCoordinatorTest {
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
+    @Test
+    fun `activity recognition unavailable degrades when passive is effective`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val scope = CoroutineScope(SupervisorJob() + dispatcher)
+
+            val settingsRepo =
+                FakeAppSettingsRepository(effectiveOnboardingPassiveOn())
+            val gateway =
+                FakeActivityGateway(
+                    MutableStateFlow(ActivityRecognitionSnapshot.unavailable("test")),
+                )
+            val coordinator =
+                PassiveCollectionCoordinator(
+                    appSettingsRepository = settingsRepo,
+                    activityRecognitionGateway = gateway,
+                    recordingSessionRepository = FakeRecordingSessionRepository(),
+                    foregroundServiceController = FakeForegroundServiceController(),
+                    permissionChecker =
+                        FakePermissionChecker(
+                            context = ApplicationProvider.getApplicationContext(),
+                            granted = true,
+                        ),
+                    serviceStateRegistry = CollectorServiceStateRegistry(),
+                    applicationScope = scope,
+                )
+
+            coordinator.start()
+            advanceUntilIdle()
+
+            assertEquals(CollectorLifecycleState.DEGRADED, coordinator.uiState.value.lifecycleState)
+        }
+
+    @Test
+    fun `arming completes into recording when driving stays likely`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val scope = CoroutineScope(SupervisorJob() + dispatcher)
+
+            val settingsRepo = FakeAppSettingsRepository(effectiveOnboardingPassiveOn())
+            val drivingSnap =
+                ActivityRecognitionSnapshot(
+                    playServicesAvailable = true,
+                    updatesActive = true,
+                    lastErrorMessage = null,
+                    likelyInVehicle = true,
+                    lastDetectedActivityType = DetectedActivity.IN_VEHICLE,
+                    lastConfidence = 60,
+                    lastUpdateEpochMs = 1L,
+                )
+            val gateway = FakeActivityGateway(MutableStateFlow(drivingSnap))
+            val repo = FakeRecordingSessionRepository()
+            val fg = FakeForegroundServiceController()
+
+            val coordinator =
+                PassiveCollectionCoordinator(
+                    appSettingsRepository = settingsRepo,
+                    activityRecognitionGateway = gateway,
+                    recordingSessionRepository = repo,
+                    foregroundServiceController = fg,
+                    permissionChecker =
+                        FakePermissionChecker(
+                            context = ApplicationProvider.getApplicationContext(),
+                            granted = true,
+                        ),
+                    serviceStateRegistry = CollectorServiceStateRegistry(),
+                    applicationScope = scope,
+                )
+
+            coordinator.start()
+            runCurrent()
+
+            assertEquals(CollectorLifecycleState.ARMING, coordinator.uiState.value.lifecycleState)
+
+            advanceTimeBy(4_000L)
+            runCurrent()
+
+            assertEquals(CollectorLifecycleState.RECORDING, coordinator.uiState.value.lifecycleState)
+            assertEquals(1L, coordinator.uiState.value.activeSessionId)
+            assertEquals(1, fg.starts)
+        }
+
+    private class FakeActivityGateway(
+        private val backing: MutableStateFlow<ActivityRecognitionSnapshot>,
+    ) : ActivityRecognitionGateway {
+        override val snapshot: StateFlow<ActivityRecognitionSnapshot> = backing.asStateFlow()
+
+        override suspend fun startUpdates() {
+            backing.value = backing.value.copy(updatesActive = true)
+        }
+
+        override suspend fun stopUpdates() {
+            backing.value = backing.value.copy(updatesActive = false)
+        }
+    }
+
+    private class FakeRecordingSessionRepository : RecordingSessionRepository {
+        private var id = 0L
+        override suspend fun beginAutoRecordingSession(params: AutoRecordingSessionStartParams): Long {
+            id += 1
+            return id
+        }
+
+        override suspend fun endRecordingSession(
+            sessionId: Long,
+            endedAtEpochMs: Long,
+            endState: SessionState,
+        ) = Unit
+
+        override suspend fun countSessions(): Long = 0L
+
+        override suspend fun findOpenSessionId(): Long? = null
+    }
+
+    private class FakeForegroundServiceController : CollectorForegroundServiceController {
+        var starts: Int = 0
+        var stops: Int = 0
+
+        override fun startCollectorService() {
+            starts++
+        }
+
+        override fun stopCollectorService() {
+            stops++
+        }
+    }
+
+    private class FakePermissionChecker(
+        context: Context,
+        private val granted: Boolean,
+    ) : ActivityRecognitionPermissionChecker(context) {
+        override fun isGranted(): Boolean = granted
+    }
+}
+
+private fun effectiveOnboardingPassiveOn(): AppSettings =
+    AppSettings(
+        onboardingCompleted = true,
+        passiveCollectionUserEnabled = true,
+        passiveCollectionEffective = true,
+        uploadWifiOnly = true,
+        uploadAllowCellular = false,
+        uploadOnlyWhileCharging = false,
+        uploadPauseOnLowBatteryEnabled = true,
+        uploadLowBatteryThresholdPercent = 20,
+        retentionDays = 30,
+        maxLocalStorageMb = 0,
+        localCompactionEnabled = false,
+        captureMinSpeedMps = 4.5f,
+        debugModeEnabled = false,
+    )
