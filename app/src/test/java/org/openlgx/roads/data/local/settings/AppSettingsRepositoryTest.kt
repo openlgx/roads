@@ -73,4 +73,38 @@ class AppSettingsRepositoryTest {
             repo.setCalibrationWorkflowEnabled(true)
             assertThat(repo.settings.first().calibrationWorkflowEnabled).isTrue()
         }
+
+    @Test
+    fun pilotBootstrapIsOneShot() =
+        runBlocking {
+            val repo = createRepository()
+            val first =
+                repo.applyPilotBootstrapIfNeverApplied(
+                    label = "t1",
+                    baseUrl = "https://x.supabase.co",
+                    councilSlug = "c",
+                    projectSlug = "p",
+                    projectId = "proj",
+                    deviceId = "dev",
+                    uploadApiKey = "",
+                )
+            assertThat(first).isTrue()
+            val s = repo.settings.first()
+            assertThat(s.pilotBootstrapApplied).isTrue()
+            assertThat(s.uploadCouncilSlug).isEqualTo("c")
+            assertThat(s.uploadBaseUrl).endsWith("/functions/v1")
+
+            val second =
+                repo.applyPilotBootstrapIfNeverApplied(
+                    label = "t2",
+                    baseUrl = "https://other.supabase.co",
+                    councilSlug = "c2",
+                    projectSlug = "p2",
+                    projectId = "p2",
+                    deviceId = "d2",
+                    uploadApiKey = "",
+                )
+            assertThat(second).isFalse()
+            assertThat(repo.settings.first().uploadCouncilSlug).isEqualTo("c")
+        }
 }

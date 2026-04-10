@@ -27,4 +27,8 @@ data class HostedUploadDiagnosticsUi(
     val uploadAutoAfterSession: Boolean,
     val roadFilterEnabled: Boolean,
     val roadPackRequiredForAutoUpload: Boolean,
+    val pilotBootstrapApplied: Boolean,
+    val pilotBootstrapLabel: String?,
+    val roadPackExpectedPath: String,
+    val uploadReadinessNotes: List<String>,
 )

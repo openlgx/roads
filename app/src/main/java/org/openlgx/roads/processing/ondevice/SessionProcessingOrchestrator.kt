@@ -265,7 +265,9 @@ constructor(
                     roadResponse = roadResponseAvg?.takeIf { it.isFinite() },
                     roadResponseMethodVersion = SessionProcessingMethodVersions.HEURISTIC_CORNERING_SHOCK,
                 )
-                val refreshed = database.recordingSessionDao().getById(sessionId)!!
+                val refreshed =
+                    database.recordingSessionDao().getById(sessionId)
+                        ?: error("session missing after aggregate update")
                 database.recordingSessionDao().updateProcessingFields(
                     sessionId = sessionId,
                     processingState = SessionProcessingState.COMPLETED,

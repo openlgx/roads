@@ -1,5 +1,6 @@
 package org.openlgx.roads.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -15,6 +16,8 @@ import org.openlgx.roads.data.local.db.model.SessionUploadState
         Index("uuid"),
         Index("startedAtEpochMs"),
         Index(value = ["state", "startedAtEpochMs"]),
+        /** Must match [RoadsDatabaseMigrations.MIGRATION_4_5] `index_recording_sessions_hostedPipelineState`. */
+        Index(value = ["hostedPipelineState"]),
     ],
 )
 data class RecordingSessionEntity(
@@ -49,6 +52,7 @@ data class RecordingSessionEntity(
     val roughnessMethodVersion: String? = null,
     val roadResponseScore: Double? = null,
     val roadResponseMethodVersion: String? = null,
+    @ColumnInfo(defaultValue = "NOT_STARTED")
     val processingState: SessionProcessingState = SessionProcessingState.NOT_STARTED,
     val processingStartedAtEpochMs: Long? = null,
     val processingCompletedAtEpochMs: Long? = null,
@@ -56,5 +60,6 @@ data class RecordingSessionEntity(
     /** Rich aggregates JSON; workflow uses [processingState] columns first. */
     val processingSummaryJson: String? = null,
     /** Hosted alpha: remote upload + server processing visibility. */
+    @ColumnInfo(defaultValue = "NOT_STARTED")
     val hostedPipelineState: SessionHostedPipelineState = SessionHostedPipelineState.NOT_STARTED,
 )

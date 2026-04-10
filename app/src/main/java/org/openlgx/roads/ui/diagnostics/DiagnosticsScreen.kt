@@ -71,6 +71,15 @@ fun DiagnosticsScreen(
                 ) {
                     Text("App", style = MaterialTheme.typography.titleMedium)
                     Text("Version: ${snap.appVersionName}")
+                    Text("Pilot bootstrap: ${snap.pilotBootstrapSummary}", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "Expected road pack GeoJSON (example): ${snap.roadPackExpectedPath}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text("Hosted upload readiness:", style = MaterialTheme.typography.titleSmall)
+                    snap.hostedUploadReadinessLines.forEach { line ->
+                        Text("• $line", style = MaterialTheme.typography.bodySmall)
+                    }
                     Text("Device", style = MaterialTheme.typography.titleMedium)
                     Text("Manufacturer: ${snap.manufacturer}")
                     Text("Model: ${snap.deviceModel}")

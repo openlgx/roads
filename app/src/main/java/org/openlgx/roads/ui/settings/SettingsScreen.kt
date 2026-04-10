@@ -3,20 +3,27 @@ package org.openlgx.roads.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.openlgx.roads.data.local.settings.CaptureSettingsPreset
@@ -101,13 +108,107 @@ fun SettingsScreen(
 
             Text("Hosted alpha upload", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Additive cloud upload (Supabase Edge + Neon). Device builds only need upload base URL + DEVICE_UPLOAD key + project/device UUIDs (never Neon or Supabase service keys). See docs/pilot-readiness.md.",
+                "Uploads go to Supabase Edge (not Neon). Paste the functions base URL and DEVICE_UPLOAD key " +
+                    "from seed_pilot_council plus project/device UUIDs. Never put Neon URLs or service keys here. " +
+                    "See docs/pilot-readiness.md.",
                 style = MaterialTheme.typography.bodySmall,
             )
+            var draftBaseUrl by remember { mutableStateOf(settings.uploadBaseUrl) }
+            var draftApiKey by remember { mutableStateOf("") }
+            var draftCouncilSlug by remember { mutableStateOf(settings.uploadCouncilSlug) }
+            var draftProjectSlug by remember { mutableStateOf(settings.uploadProjectSlug) }
+            var draftProjectId by remember { mutableStateOf(settings.uploadProjectId) }
+            var draftDeviceId by remember { mutableStateOf(settings.uploadDeviceId) }
+            LaunchedEffect(
+                settings.uploadBaseUrl,
+                settings.uploadCouncilSlug,
+                settings.uploadProjectSlug,
+                settings.uploadProjectId,
+                settings.uploadDeviceId,
+            ) {
+                draftBaseUrl = settings.uploadBaseUrl
+                draftCouncilSlug = settings.uploadCouncilSlug
+                draftProjectSlug = settings.uploadProjectSlug
+                draftProjectId = settings.uploadProjectId
+                draftDeviceId = settings.uploadDeviceId
+            }
+            Text("Hosted connection (pilot)", style = MaterialTheme.typography.titleSmall)
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = draftBaseUrl,
+                onValueChange = { draftBaseUrl = it },
+                label = { Text("Upload base URL") },
+                supportingText = {
+                    Text(
+                        "Use https://YOUR_REF.supabase.co/functions/v1. If you paste the project root only " +
+                            "(…supabase.co), /functions/v1 is added automatically on Save for *.supabase.co.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = draftApiKey,
+                onValueChange = { draftApiKey = it },
+                label = { Text("DEVICE_UPLOAD API key (leave blank to keep saved)") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = draftCouncilSlug,
+                onValueChange = { draftCouncilSlug = it },
+                label = { Text("Council slug") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = draftProjectSlug,
+                onValueChange = { draftProjectSlug = it },
+                label = { Text("Project slug (Neon)") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = draftProjectId,
+                onValueChange = { draftProjectId = it },
+                label = { Text("Project id (UUID)") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = draftDeviceId,
+                onValueChange = { draftDeviceId = it },
+                label = { Text("Device id (UUID)") },
+                singleLine = true,
+            )
+            Button(
+                onClick = {
+                    viewModel.applyHostedPilotConnection(
+                        uploadBaseUrl = draftBaseUrl,
+                        apiKeyIfProvided = draftApiKey,
+                        councilSlug = draftCouncilSlug,
+                        projectSlug = draftProjectSlug,
+                        projectId = draftProjectId,
+                        deviceId = draftDeviceId,
+                    )
+                    draftApiKey = ""
+                },
+            ) {
+                Text("Save hosted connection")
+            }
             Button(onClick = { viewModel.applyPilotUploadDefaults() }) {
                 Text("Apply recommended pilot upload defaults")
             }
             Text("Hosted upload diagnostics (no secrets shown)", style = MaterialTheme.typography.titleSmall)
+            if (hostedDiag.pilotBootstrapApplied) {
+                Text(
+                    "Pilot bootstrap: active — label ${hostedDiag.pilotBootstrapLabel ?: "—"} " +
+                        "(one-shot seed; edits here are not overwritten).",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Text("Upload enabled: ${hostedDiag.uploadEnabled}", style = MaterialTheme.typography.bodySmall)
             Text(
                 "Base URL host: ${hostedDiag.uploadBaseUrlHost}",
@@ -126,11 +227,20 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
-                "Road pack: ${if (hostedDiag.roadPackPresent) "loaded" else "missing"} " +
+                "Road pack (for council slug above): " +
+                    "${if (hostedDiag.roadPackPresent) "loaded" else "missing — auto-upload is skipped (not crashed) when \"Require road pack\" is on"} " +
                     "(${hostedDiag.roadPackFeatureCount} features)" +
                     (hostedDiag.roadPackVersionLabel?.let { " · version dir $it" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
             )
+            Text(
+                "Expected GeoJSON path: ${hostedDiag.roadPackExpectedPath}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text("Upload readiness:", style = MaterialTheme.typography.labelMedium)
+            hostedDiag.uploadReadinessNotes.forEach { note ->
+                Text("• $note", style = MaterialTheme.typography.bodySmall)
+            }
             hostedDiag.roadPackLoadNote?.let {
                 Text("Pack load note: $it", style = MaterialTheme.typography.bodySmall)
             }
@@ -147,7 +257,7 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
-                "Last upload error: ${hostedDiag.uploadLastError ?: "—"}",
+                "Last upload error (sanitized): ${hostedDiag.uploadLastError ?: "—"}",
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
@@ -158,10 +268,6 @@ fun SettingsScreen(
             Text(
                 "Retry limit: ${hostedDiag.uploadRetryLimit} · auto after session: ${hostedDiag.uploadAutoAfterSession} · " +
                     "road filter: ${hostedDiag.roadFilterEnabled} · pack required for auto: ${hostedDiag.roadPackRequiredForAutoUpload}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                "Road pack path on device: Android files dir → road_packs/<council_slug>/<version>/public-roads.geojson",
                 style = MaterialTheme.typography.bodySmall,
             )
             SettingToggleRow(

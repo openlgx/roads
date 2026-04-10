@@ -32,15 +32,9 @@ constructor(
         if (settings.uploadRoadPackRequiredForAutoUpload &&
             !roadPackManager.hasPackForCouncil(settings.uploadCouncilSlug)
         ) {
-            val slug = settings.uploadCouncilSlug.trim().ifEmpty { "(not set)" }
             roadsDatabase.recordingSessionDao().updateHostedPipelineState(
                 sessionId,
-                SessionHostedPipelineState.FAILED,
-            )
-            appSettingsRepository.markHostedUploadFailure(
-                sessionId,
-                "Road pack required for auto-upload but none installed for council slug \"$slug\". " +
-                    "Sideload pack to files/road_packs/<slug>/<version>/public-roads.geojson.",
+                SessionHostedPipelineState.UPLOAD_SKIPPED,
             )
             return
         }

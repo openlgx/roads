@@ -16,6 +16,7 @@ import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.permission.FineLocationPermissionChecker
 import org.openlgx.roads.service.CollectorServiceStateRegistry
 import org.openlgx.roads.export.ExportDiagnosticsRepository
+import org.openlgx.roads.roadpack.RoadPackManager
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,6 +35,7 @@ constructor(
     private val sensorRecordingController: SensorRecordingController,
     private val collectorServiceStateRegistry: CollectorServiceStateRegistry,
     private val exportDiagnosticsRepository: ExportDiagnosticsRepository,
+    private val roadPackManager: RoadPackManager,
 ) : DiagnosticsRepository {
 
     override suspend fun loadSnapshot(): DiagnosticsSnapshot {
@@ -110,6 +112,41 @@ constructor(
             File(context.getExternalFilesDir(null) ?: context.filesDir, "olgx_exports")
                 .absolutePath
 
+        val roadPackHint = roadPackManager.expectedPublicRoadsPathHint(settings.uploadCouncilSlug)
+        val pilotBootstrapSummary =
+            if (settings.pilotBootstrapApplied) {
+                "Yes — label: ${settings.pilotBootstrapLabel ?: "—"} (one-shot seed; overrides respected)"
+            } else {
+                "No (manual pilot fields or non-bootstrap build)"
+            }
+        val hostedUploadReadinessLines =
+            buildList {
+                val slug = settings.uploadCouncilSlug.trim()
+                if (slug.isNotEmpty() && !roadPackManager.hasPackForCouncil(slug)) {
+                    add(
+                        "Road pack not installed for council \"$slug\". Expected GeoJSON path (example): $roadPackHint",
+                    )
+                }
+                if (!settings.uploadEnabled) {
+                    add("Hosted upload is disabled — recording, processing, and export still work on device.")
+                } else {
+                    if (settings.uploadApiKey.isBlank()) {
+                        add(
+                            "Upload is enabled but no API key is stored — add DEVICE_UPLOAD key in Settings or inject for debug (see README).",
+                        )
+                    }
+                    if (settings.uploadBaseUrl.isBlank()) {
+                        add("Upload base URL is blank — hosted pipeline cannot run.")
+                    }
+                    if (settings.uploadProjectId.isBlank() || settings.uploadDeviceId.isBlank()) {
+                        add("Project id and/or device id is blank — uploads-create request will be incomplete.")
+                    }
+                }
+                if (isEmpty()) {
+                    add("No hosted upload / road-pack blockers detected from current settings (queue still follows network and charging rules).")
+                }
+            }
+
         val dataQualityWarnings =
             buildList {
                 if (openSessionId != null && locationSamplesForOpen == 0L) {
@@ -138,6 +175,9 @@ constructor(
 
         return DiagnosticsSnapshot(
             appVersionName = BuildConfig.VERSION_NAME,
+            pilotBootstrapSummary = pilotBootstrapSummary,
+            roadPackExpectedPath = roadPackHint,
+            hostedUploadReadinessLines = hostedUploadReadinessLines,
             deviceModel = Build.MODEL,
             sdkInt = Build.VERSION.SDK_INT,
             manufacturer = Build.MANUFACTURER,

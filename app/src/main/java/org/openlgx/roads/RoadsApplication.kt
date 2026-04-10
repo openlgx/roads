@@ -8,6 +8,7 @@ import org.openlgx.roads.BuildConfig
 import org.openlgx.roads.debug.AgentDebugLog
 import org.openlgx.roads.di.HiltWorkerFactoryEntryPoint
 import org.openlgx.roads.di.PassiveCollectionEntryPoint
+import org.openlgx.roads.di.PilotBootstrapEntryPoint
 import timber.log.Timber
 
 @HiltAndroidApp
@@ -55,6 +56,10 @@ class RoadsApplication : Application(), Configuration.Provider {
             )
             // #endregion
         }
+
+        EntryPointAccessors.fromApplication(this, PilotBootstrapEntryPoint::class.java)
+            .pilotBootstrapCoordinator()
+            .scheduleInitialRun()
 
         EntryPointAccessors.fromApplication(this, PassiveCollectionEntryPoint::class.java)
             .passiveCollectionHandle()

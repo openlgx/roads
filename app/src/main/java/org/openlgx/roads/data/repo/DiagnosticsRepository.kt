@@ -53,6 +53,9 @@ data class ExportDiagnosticsSnapshot(
 
 data class DiagnosticsSnapshot(
     val appVersionName: String,
+    val pilotBootstrapSummary: String,
+    val roadPackExpectedPath: String,
+    val hostedUploadReadinessLines: List<String>,
     val deviceModel: String,
     val sdkInt: Int,
     val manufacturer: String,

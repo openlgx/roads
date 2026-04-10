@@ -1,19 +1,23 @@
 package org.openlgx.roads.receiver
 
+import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import org.openlgx.roads.collector.PassiveCollectionHandle
+import dagger.hilt.android.EntryPointAccessors
+import org.openlgx.roads.di.PassiveCollectionEntryPoint
 
-@AndroidEntryPoint
+/**
+ * Uses an entry point so this receiver never depends on Hilt field injection (avoids lateinit crashes
+ * if the receiver runs in an unusual process/ordering path).
+ */
 class BootCompletedReceiver : BroadcastReceiver() {
-
-    @Inject lateinit var passiveCollectionHandle: PassiveCollectionHandle
 
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
-        passiveCollectionHandle.start()
+        val app = context.applicationContext as Application
+        EntryPointAccessors.fromApplication(app, PassiveCollectionEntryPoint::class.java)
+            .passiveCollectionHandle()
+            .start()
     }
 }

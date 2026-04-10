@@ -8,10 +8,30 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import java.net.URI
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Pilot footgun: project URL only (`https://<ref>.supabase.co`) 404s on uploads-create because
+ * functions live under `/functions/v1`. Append when host is supabase.co and path has no `functions`.
+ */
+internal fun normalizeHostedUploadBaseUrl(url: String): String {
+    val trimmed = url.trim()
+    if (trimmed.isEmpty()) return trimmed
+    return try {
+        val u = URI(trimmed)
+        val host = u.host?.lowercase() ?: return trimmed
+        if (!host.endsWith("supabase.co")) return trimmed.trimEnd('/')
+        val path = (u.path ?: "").trim('/')
+        if (path.contains("functions")) return trimmed.trimEnd('/')
+        "${trimmed.trimEnd('/')}/functions/v1"
+    } catch (_: Exception) {
+        trimmed
+    }
+}
 
 @Singleton
 class AppSettingsRepositoryImpl
@@ -67,6 +87,8 @@ constructor(
         val hostedUploadLastSuccessMs = longPreferencesKey("hosted_upload_last_success_ms")
         val hostedUploadLastError = stringPreferencesKey("hosted_upload_last_error")
         val latestHostedUploadAttemptSessionId = longPreferencesKey("hosted_upload_last_session_id")
+        val pilotBootstrapApplied = booleanPreferencesKey("pilot_bootstrap_applied")
+        val pilotBootstrapLabel = stringPreferencesKey("pilot_bootstrap_label")
     }
 
     override val settings: Flow<AppSettings> =
@@ -146,6 +168,8 @@ constructor(
                 hostedUploadLastSuccessAtEpochMs = prefs[Keys.hostedUploadLastSuccessMs],
                 hostedUploadLastError = prefs[Keys.hostedUploadLastError],
                 latestHostedUploadAttemptLocalSessionId = prefs[Keys.latestHostedUploadAttemptSessionId],
+                pilotBootstrapApplied = prefs[Keys.pilotBootstrapApplied] ?: false,
+                pilotBootstrapLabel = prefs[Keys.pilotBootstrapLabel],
             )
         }
 
@@ -315,7 +339,46 @@ constructor(
     }
 
     override suspend fun setUploadBaseUrl(url: String) {
-        dataStore.edit { it[Keys.uploadBaseUrl] = url }
+        val normalized = normalizeHostedUploadBaseUrl(url)
+        dataStore.edit { it[Keys.uploadBaseUrl] = normalized }
+    }
+
+    override suspend fun applyPilotBootstrapIfNeverApplied(
+        label: String,
+        baseUrl: String,
+        councilSlug: String,
+        projectSlug: String,
+        projectId: String,
+        deviceId: String,
+        uploadApiKey: String,
+    ): Boolean {
+        var appliedNow = false
+        dataStore.edit { prefs ->
+            if (prefs[Keys.pilotBootstrapApplied] == true) return@edit
+            prefs[Keys.pilotBootstrapApplied] = true
+            prefs[Keys.pilotBootstrapLabel] = label.trim()
+            prefs[Keys.uploadBaseUrl] = normalizeHostedUploadBaseUrl(baseUrl)
+            prefs[Keys.uploadCouncilSlug] = councilSlug.trim()
+            prefs[Keys.uploadProjectSlug] = projectSlug.trim()
+            prefs[Keys.uploadProjectId] = projectId.trim()
+            prefs[Keys.uploadDeviceId] = deviceId.trim()
+            val key = uploadApiKey.trim()
+            if (key.isNotEmpty()) {
+                prefs[Keys.uploadApiKey] = key
+                prefs[Keys.uploadEnabled] = true
+            } else {
+                prefs[Keys.uploadEnabled] = false
+            }
+            prefs[Keys.uploadWifiOnly] = true
+            prefs[Keys.uploadAllowCellular] = false
+            prefs[Keys.uploadChargingPreferred] = true
+            prefs[Keys.uploadRetryLimit] = 3
+            prefs[Keys.uploadAutoAfterSession] = true
+            prefs[Keys.uploadRoadFilterEnabled] = true
+            prefs[Keys.uploadRoadPackRequired] = true
+            appliedNow = true
+        }
+        return appliedNow
     }
 
     override suspend fun setUploadApiKey(key: String) {

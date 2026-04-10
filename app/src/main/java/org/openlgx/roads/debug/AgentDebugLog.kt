@@ -35,11 +35,9 @@ object AgentDebugLog {
     fun install(app: Application) {
         if (!BuildConfig.DEBUG) return
         val dir = app.getExternalFilesDir(null) ?: app.filesDir
-        logFile = File(dir, AGENT_DEBUG_LOG_FILE_NAME)
-        Timber.i(
-            "Debug NDJSON log (adb pull): %s",
-            logFile!!.absolutePath,
-        )
+        val lf = File(dir, AGENT_DEBUG_LOG_FILE_NAME)
+        logFile = lf
+        Timber.i("Debug NDJSON log (adb pull): %s", lf.absolutePath)
     }
 
     private fun buildLine(

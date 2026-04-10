@@ -155,6 +155,16 @@ class SessionExporterRoomTest {
 
         override suspend fun markHostedUploadFailure(sessionId: Long, message: String, timestampMs: Long) =
             Unit
+
+        override suspend fun applyPilotBootstrapIfNeverApplied(
+            label: String,
+            baseUrl: String,
+            councilSlug: String,
+            projectSlug: String,
+            projectId: String,
+            deviceId: String,
+            uploadApiKey: String,
+        ): Boolean = false
     }
 
     private fun defaultSettings(calibrationWorkflow: Boolean = false): AppSettings =

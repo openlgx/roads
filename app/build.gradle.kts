@@ -37,6 +37,22 @@ val hasReleaseSigning: Boolean =
         releaseKeyAlias != null &&
         releaseKeyPassword != null
 
+/** Untracked `local.properties`; may contain device-specific SDK path only, or `roads.pilot.upload.key` for debug. */
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
+fun escapeForBuildConfigString(value: String): String =
+    value.replace("\\", "\\\\").replace("\"", "\\\"")
+
+fun resolvePilotUploadKey(): String {
+    val fromEnv = System.getenv("ROADS_PILOT_UPLOAD_KEY")?.trim().orEmpty()
+    if (fromEnv.isNotEmpty()) return fromEnv
+    return localProperties.getProperty("roads.pilot.upload.key", "").trim()
+}
+
 android {
     namespace = "org.openlgx.roads"
     compileSdk = 35
@@ -73,12 +89,24 @@ android {
     }
 
     buildTypes {
+        debug {
+            isDebuggable = true
+            val pilotKey = escapeForBuildConfigString(resolvePilotUploadKey())
+            buildConfigField("Boolean", "PILOT_BOOTSTRAP_ENABLED", "true")
+            buildConfigField("String", "PILOT_UPLOAD_API_KEY", "\"$pilotKey\"")
+            val pilotLabel =
+                escapeForBuildConfigString("${defaultConfig.versionName}-debug")
+            buildConfigField("String", "PILOT_BOOTSTRAP_LABEL", "\"$pilotLabel\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            buildConfigField("Boolean", "PILOT_BOOTSTRAP_ENABLED", "false")
+            buildConfigField("String", "PILOT_UPLOAD_API_KEY", "\"\"")
+            buildConfigField("String", "PILOT_BOOTSTRAP_LABEL", "\"\"")
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }

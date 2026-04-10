@@ -98,4 +98,19 @@ interface AppSettingsRepository {
         message: String,
         timestampMs: Long = System.currentTimeMillis(),
     )
+
+    /**
+     * One-shot seed for alpha/debug builds: writes council URL/IDs and optional [uploadApiKey],
+     * applies recommended upload toggles, sets [AppSettings.pilotBootstrapApplied].
+     * @return true if this call performed the initial write.
+     */
+    suspend fun applyPilotBootstrapIfNeverApplied(
+        label: String,
+        baseUrl: String,
+        councilSlug: String,
+        projectSlug: String,
+        projectId: String,
+        deviceId: String,
+        uploadApiKey: String,
+    ): Boolean
 }

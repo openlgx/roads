@@ -50,4 +50,6 @@ fun testAppSettings(
         hostedUploadLastSuccessAtEpochMs = null,
         hostedUploadLastError = null,
         latestHostedUploadAttemptLocalSessionId = null,
+        pilotBootstrapApplied = false,
+        pilotBootstrapLabel = null,
     )

@@ -39,6 +39,15 @@ constructor(
         resolveVersionDir(councilSlug)?.let { File(it, "public-roads.geojson") }
             .takeIf { it?.isFile == true }
 
+    /**
+     * Absolute path hint for operators (app-private storage): `.../road_packs/<slug>/<version>/public-roads.geojson`.
+     * [councilSlug] may be empty — placeholder segment is shown.
+     */
+    fun expectedPublicRoadsPathHint(councilSlug: String): String {
+        val slug = councilSlug.trim().lowercase().ifEmpty { "<council_slug>" }
+        return File(baseDir(slug), "<version>/public-roads.geojson").absolutePath
+    }
+
     fun getLocalIndex(councilSlug: String): LocalRoadIndex {
         ensureLoaded(councilSlug)
         return cachedIndex

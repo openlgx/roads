@@ -77,6 +77,8 @@ constructor(
                     hostedUploadLastSuccessAtEpochMs = null,
                     hostedUploadLastError = null,
                     latestHostedUploadAttemptLocalSessionId = null,
+                    pilotBootstrapApplied = false,
+                    pilotBootstrapLabel = null,
                 ),
         )
 
@@ -106,6 +108,10 @@ constructor(
                 uploadAutoAfterSession = false,
                 roadFilterEnabled = false,
                 roadPackRequiredForAutoUpload = true,
+                pilotBootstrapApplied = false,
+                pilotBootstrapLabel = null,
+                roadPackExpectedPath = "",
+                uploadReadinessNotes = emptyList(),
             ),
         )
     val hostedDiagnostics: StateFlow<HostedUploadDiagnosticsUi> = _hostedDiagnostics.asStateFlow()
@@ -116,6 +122,31 @@ constructor(
                 roadPackManager.invalidateCache()
                 val diag = roadPackManager.getDiagnostics(s.uploadCouncilSlug)
                 val pending = roadsDatabase.uploadBatchDao().countPendingOrRetryable()
+                val slug = s.uploadCouncilSlug.trim()
+                val readiness =
+                    buildList {
+                        if (slug.isNotEmpty() && !roadPackManager.hasPackForCouncil(slug)) {
+                            add(
+                                "Road pack missing for \"$slug\". Install: ${roadPackManager.expectedPublicRoadsPathHint(slug)}",
+                            )
+                        }
+                        if (!s.uploadEnabled) {
+                            add("Hosted upload is off — local capture and review still work.")
+                        } else {
+                            if (s.uploadApiKey.isBlank()) {
+                                add("Upload on but no API key — no uploads until key is set or injected for debug.")
+                            }
+                            if (s.uploadBaseUrl.isBlank()) {
+                                add("Upload base URL is blank.")
+                            }
+                            if (s.uploadProjectId.isBlank() || s.uploadDeviceId.isBlank()) {
+                                add("Project id and/or device id is blank.")
+                            }
+                        }
+                        if (isEmpty()) {
+                            add("No upload blockers from settings (network/charging rules still apply).")
+                        }
+                    }
                 _hostedDiagnostics.value =
                     HostedUploadDiagnosticsUi(
                         uploadEnabled = s.uploadEnabled,
@@ -141,6 +172,10 @@ constructor(
                         uploadAutoAfterSession = s.uploadAutoAfterSessionEnabled,
                         roadFilterEnabled = s.uploadRoadFilterEnabled,
                         roadPackRequiredForAutoUpload = s.uploadRoadPackRequiredForAutoUpload,
+                        pilotBootstrapApplied = s.pilotBootstrapApplied,
+                        pilotBootstrapLabel = s.pilotBootstrapLabel,
+                        roadPackExpectedPath = roadPackManager.expectedPublicRoadsPathHint(s.uploadCouncilSlug),
+                        uploadReadinessNotes = readiness,
                     )
             }
         }
@@ -259,6 +294,30 @@ constructor(
             appSettingsRepository.setUploadAutoAfterSessionEnabled(true)
             appSettingsRepository.setUploadRoadFilterEnabled(true)
             appSettingsRepository.setUploadRoadPackRequiredForAutoUpload(true)
+        }
+    }
+
+    /**
+     * Persists hosted alpha connection fields for pilot installs. [apiKeyIfProvided] is only written
+     * when non-blank so operators can change other fields without re-pasting the key.
+     */
+    fun applyHostedPilotConnection(
+        uploadBaseUrl: String,
+        apiKeyIfProvided: String,
+        councilSlug: String,
+        projectSlug: String,
+        projectId: String,
+        deviceId: String,
+    ) {
+        viewModelScope.launch {
+            appSettingsRepository.setUploadBaseUrl(uploadBaseUrl.trim())
+            if (apiKeyIfProvided.isNotBlank()) {
+                appSettingsRepository.setUploadApiKey(apiKeyIfProvided.trim())
+            }
+            appSettingsRepository.setUploadCouncilSlug(councilSlug.trim())
+            appSettingsRepository.setUploadProjectSlug(projectSlug.trim())
+            appSettingsRepository.setUploadProjectId(projectId.trim())
+            appSettingsRepository.setUploadDeviceId(deviceId.trim())
         }
     }
 

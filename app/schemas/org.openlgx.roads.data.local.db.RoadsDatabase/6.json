@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 6,
-    "identityHash": "f7f18ea7ea7b91b83bc2831e05de5868",
+    "identityHash": "96fe2e1b776e04f31219687fb46b87ff",
     "entities": [
       {
         "tableName": "device_profiles",
@@ -84,7 +84,7 @@
       },
       {
         "tableName": "recording_sessions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `uuid` TEXT NOT NULL, `armedAtEpochMs` INTEGER, `startedAtEpochMs` INTEGER NOT NULL, `endedAtEpochMs` INTEGER, `state` TEXT NOT NULL, `recordingSource` TEXT NOT NULL, `qualityFlags` INTEGER NOT NULL, `sessionUploadState` TEXT NOT NULL, `autoDetectionSnapshotJson` TEXT, `collectorStateSnapshotJson` TEXT, `sensorCaptureSnapshotJson` TEXT, `roadEligibilitySummaryJson` TEXT, `capturePassiveCollectionEnabled` INTEGER, `capturePolicySnapshotJson` TEXT, `uploadPolicyWifiOnly` INTEGER, `uploadPolicyAllowCellular` INTEGER, `uploadPolicyOnlyWhileCharging` INTEGER, `uploadPolicyPauseOnLowBattery` INTEGER, `uploadPolicyLowBatteryThresholdPercent` INTEGER, `roughnessProxyScore` REAL, `roughnessMethodVersion` TEXT, `roadResponseScore` REAL, `roadResponseMethodVersion` TEXT, `processingState` TEXT NOT NULL, `processingStartedAtEpochMs` INTEGER, `processingCompletedAtEpochMs` INTEGER, `processingLastError` TEXT, `processingSummaryJson` TEXT, `hostedPipelineState` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `uuid` TEXT NOT NULL, `armedAtEpochMs` INTEGER, `startedAtEpochMs` INTEGER NOT NULL, `endedAtEpochMs` INTEGER, `state` TEXT NOT NULL, `recordingSource` TEXT NOT NULL, `qualityFlags` INTEGER NOT NULL, `sessionUploadState` TEXT NOT NULL, `autoDetectionSnapshotJson` TEXT, `collectorStateSnapshotJson` TEXT, `sensorCaptureSnapshotJson` TEXT, `roadEligibilitySummaryJson` TEXT, `capturePassiveCollectionEnabled` INTEGER, `capturePolicySnapshotJson` TEXT, `uploadPolicyWifiOnly` INTEGER, `uploadPolicyAllowCellular` INTEGER, `uploadPolicyOnlyWhileCharging` INTEGER, `uploadPolicyPauseOnLowBattery` INTEGER, `uploadPolicyLowBatteryThresholdPercent` INTEGER, `roughnessProxyScore` REAL, `roughnessMethodVersion` TEXT, `roadResponseScore` REAL, `roadResponseMethodVersion` TEXT, `processingState` TEXT NOT NULL DEFAULT 'NOT_STARTED', `processingStartedAtEpochMs` INTEGER, `processingCompletedAtEpochMs` INTEGER, `processingLastError` TEXT, `processingSummaryJson` TEXT, `hostedPipelineState` TEXT NOT NULL DEFAULT 'NOT_STARTED')",
         "fields": [
           {
             "fieldPath": "id",
@@ -234,7 +234,8 @@
             "fieldPath": "processingState",
             "columnName": "processingState",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "'NOT_STARTED'"
           },
           {
             "fieldPath": "processingStartedAtEpochMs",
@@ -264,7 +265,8 @@
             "fieldPath": "hostedPipelineState",
             "columnName": "hostedPipelineState",
             "affinity": "TEXT",
-            "notNull": true
+            "notNull": true,
+            "defaultValue": "'NOT_STARTED'"
           }
         ],
         "primaryKey": {
@@ -301,6 +303,15 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_recording_sessions_state_startedAtEpochMs` ON `${TABLE_NAME}` (`state`, `startedAtEpochMs`)"
+          },
+          {
+            "name": "index_recording_sessions_hostedPipelineState",
+            "unique": false,
+            "columnNames": [
+              "hostedPipelineState"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recording_sessions_hostedPipelineState` ON `${TABLE_NAME}` (`hostedPipelineState`)"
           }
         ],
         "foreignKeys": []
@@ -1166,7 +1177,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f7f18ea7ea7b91b83bc2831e05de5868')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '96fe2e1b776e04f31219687fb46b87ff')"
     ]
   }
 }

@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.openlgx.roads.upload.HostedPipelineDisplayState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,11 +87,31 @@ fun SessionDetailScreen(
             )
             Text("Hosted pipeline (upload / remote)", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Operator state: ${hostedDisplay ?: "—"} (see docs/pilot-readiness.md)",
+                "Operator state: ${hostedDisplay ?: "—"}",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            when (hostedDisplay) {
+                HostedPipelineDisplayState.PUBLISHED ->
+                    Text(
+                        "This label means the app finished the hosted upload/handshake for this trip. " +
+                            "Council GIS layers still update only after server publish (see docs/pilot-readiness.md).",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                HostedPipelineDisplayState.FAILED ->
+                    Text(
+                        "Check Settings → Hosted upload diagnostics for the last error and queue summary.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                HostedPipelineDisplayState.SKIPPED_LOW_VALUE ->
+                    Text(
+                        "Upload was skipped locally (road filter / low value, missing road pack when required, " +
+                            "or incomplete hosted config). Check batch skip reason and Settings → diagnostics.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                else -> Unit
+            }
             Text(
-                "Stored state: ${s.hostedPipelineState}",
+                "Stored state (DB): ${s.hostedPipelineState}",
                 style = MaterialTheme.typography.bodySmall,
             )
             d.latestUploadBatch?.let { b ->

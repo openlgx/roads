@@ -77,4 +77,10 @@ data class AppSettings(
     val hostedUploadLastError: String? = null,
     /** Local session id associated with [hostedUploadLastError] / last attempt when known. */
     val latestHostedUploadAttemptLocalSessionId: Long? = null,
+    /**
+     * When true, debug/alpha pilot bootstrap has seeded council/upload defaults (one-shot; operators may override).
+     */
+    val pilotBootstrapApplied: Boolean,
+    /** Build label recorded when bootstrap ran, e.g. `0.1.0-debug`. */
+    val pilotBootstrapLabel: String?,
 )

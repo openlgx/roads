@@ -550,7 +550,7 @@ constructor(
 
     private suspend fun finalizeCompletedSession() {
         if (lifecycleState != CollectorLifecycleState.STOP_HOLD) return
-        if (lastSettings == null) return
+        val settingsSnapshot = lastSettings ?: return
         val sid = activeSessionId
         locationRecordingController.stopAndFlush()
         sensorRecordingController.stopAndFlush()
@@ -569,12 +569,12 @@ constructor(
                 sessionId = sid,
                 endState = SessionState.COMPLETED,
                 endedAtEpochMs = endedAt,
-                calibrationWorkflowEnabled = lastSettings!!.calibrationWorkflowEnabled,
+                calibrationWorkflowEnabled = settingsSnapshot.calibrationWorkflowEnabled,
             )
-            if (lastSettings!!.processingLiveAfterSessionEnabled) {
+            if (settingsSnapshot.processingLiveAfterSessionEnabled) {
                 sessionProcessingScheduler.onSessionRecordingCompleted(sid)
             }
-            sessionUploadScheduling.scheduleAfterSessionCompleted(sid, lastSettings!!)
+            sessionUploadScheduling.scheduleAfterSessionCompleted(sid, settingsSnapshot)
             recordingEventNotifier.notifyRecordingStopped(sid, SessionState.COMPLETED.name)
             appSettingsRepository.recordRecordingStoppedAt(endedAt)
         }

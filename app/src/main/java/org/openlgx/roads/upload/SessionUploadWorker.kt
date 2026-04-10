@@ -37,16 +37,11 @@ constructor(
         if (settings.uploadRoadPackRequiredForAutoUpload &&
             !roadPackManager.hasPackForCouncil(settings.uploadCouncilSlug)
         ) {
-            val slug = settings.uploadCouncilSlug.trim().ifEmpty { "(not set)" }
             database.recordingSessionDao().updateHostedPipelineState(
                 sessionId,
-                SessionHostedPipelineState.FAILED,
+                SessionHostedPipelineState.UPLOAD_SKIPPED,
             )
-            appSettingsRepository.markHostedUploadFailure(
-                sessionId,
-                "Road pack required but missing for council slug \"$slug\".",
-            )
-            return Result.failure()
+            return Result.success()
         }
 
         if (settings.uploadBaseUrl.isBlank() || settings.uploadApiKey.isBlank() ||
@@ -54,13 +49,9 @@ constructor(
         ) {
             database.recordingSessionDao().updateHostedPipelineState(
                 sessionId,
-                SessionHostedPipelineState.FAILED,
+                SessionHostedPipelineState.UPLOAD_SKIPPED,
             )
-            appSettingsRepository.markHostedUploadFailure(
-                sessionId,
-                "Hosted upload misconfigured (need base URL, API key, project id, device id).",
-            )
-            return Result.failure()
+            return Result.success()
         }
 
         val row = database.recordingSessionDao().getById(sessionId) ?: return Result.failure()
