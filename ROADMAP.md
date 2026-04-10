@@ -47,6 +47,9 @@ It is written to align the Android collector, offline analysis tooling, future b
 5. **Open-source friendly architecture.**
    The system should stay easy for Cursor and contributors to understand, run, and extend.
 
+6. **Use device compute openly under friendly constraints.**
+   Open source lets contributors and users **inspect the same on-device logic** in-tree (Kotlin, settings, exports). Prefer scheduling heavier analysis when the phone is **plugged in** and on **Wi‑Fi / unmetered** network so behaviour is **predictable and documentable**—users know local work happens, but not at the cost of thermal or data surprises. That **reduces routine server batch load**; the hosted pipeline still ingests validated bundles and maintains a **single normalized, versioned “master” view** in Neon and Storage (sessions, jobs, `*_hosted` outputs, publish artifacts) so councils and operators have one coherent lineage, with **raw export ZIPs** as the reproducible ground truth upstream.
+
 ---
 
 ## Phase roadmap
@@ -130,7 +133,7 @@ Exit criteria:
 - raw data remains untouched by reprocessing
 
 Planned improvements (not implemented yet):
-- **Deferred on-device processing:** run windowing / anomaly work under **WorkManager**-style constraints (e.g. **charging**, **unmetered network / Wi‑Fi**, optional time windows) so heavy CPU use lands when the handset is idle, mirroring how upload policy already uses constraints — today processing is scheduled on app coroutines shortly after a completed trip (if live-after-session is on) or via **backfill**, with no charge/Wi‑Fi gate.
+- **Deferred on-device processing:** run windowing / anomaly work under **WorkManager**-style constraints (e.g. **charging**, **unmetered network / Wi‑Fi**, optional time windows) so heavy CPU use lands when the handset is idle, mirroring how upload policy already uses constraints — today processing is scheduled on app coroutines shortly after a completed trip (if live-after-session is on) or via **backfill**, with no charge/Wi‑Fi gate. Aligns with **product principle 6:** transparent local work; servers concentrate on validated ingest and a single normalized hosted view.
 - **Remote processing parameters:** optional **signed, versioned** calibration or heuristic-parameter bundle from the backend (tied to `SessionProcessingMethodVersions` semantics), fetched when network policy allows and applied on the next deferred run — needs reproducibility, rollback, integrity, and privacy review; **today** smoothing/heuristic behaviour is **local-only** (no closed loop where uploaded data drives per-device coefficients automatically).
 
 ---
