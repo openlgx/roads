@@ -77,7 +77,9 @@ Key types (Postgres check):
 
 ## GitHub Actions secrets
 
-Documented pattern (workflows may use `if: secrets.DATABASE_URL != ''`):
+GitHub does **not** allow the `secrets` context in **job-level** `if:` (you will get *Unrecognized named-value: 'secrets'*). Workflows here always run the job and **skip inside the step** with `exit 0` when required secrets are empty.
+
+Typical secrets:
 
 - `DATABASE_URL` — publish/processing jobs
 - `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_URL` — Storage from Python

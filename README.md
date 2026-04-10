@@ -79,6 +79,8 @@ Diagnostics shows export root path, last export path/time/success/error, and DB-
 | Signed release APK | `.\gradlew.bat :app:assembleRelease` (requires signing; see below) | `app\build\outputs\apk\release\app-release.apk` |
 | Unit tests | `.\gradlew.bat :app:testDebugUnitTest` | — |
 
+**Crash shortly after launch (hosted upload / WorkManager):** `@HiltWorker` requires WorkManager to use `HiltWorkerFactory` from `RoadsApplication`. The manifest disables the default `WorkManagerInitializer` so initialization goes through `Configuration.Provider`. If you still see immediate exits, capture **logcat** around `AndroidRuntime` / `WorkManager` / `Hilt`.
+
 **Prerequisites:** Android SDK; **JDK 17** (Android Studio’s bundled runtime is fine); `local.properties` with `sdk.dir` (Android Studio creates this on first open).
 
 **Windows — `JAVA_HOME is not set`:** Gradle needs `JAVA_HOME`. If you use Android Studio, point it at the bundled JBR for the current PowerShell session, then run `gradlew`:

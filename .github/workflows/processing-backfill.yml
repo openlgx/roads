@@ -8,14 +8,12 @@ on:
 jobs:
   process:
     runs-on: ubuntu-latest
-    if: ${{ secrets.DATABASE_URL != '' && secrets.SUPABASE_SECRET_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r backend/processing/requirements.txt
-      - name: Run processing worker
+      - name: Install deps and run processing worker
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
@@ -23,4 +21,10 @@ jobs:
           SUPABASE_RAW_BUCKET: ${{ secrets.SUPABASE_RAW_BUCKET }}
           PROCESSING_MAX_JOBS: "5"
         working-directory: backend/processing
-        run: python run_processing_job.py
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$SUPABASE_SECRET_KEY" ]; then
+            echo "Skipping processing: add repo secrets DATABASE_URL and SUPABASE_SECRET_KEY to run this worker."
+            exit 0
+          fi
+          pip install -r requirements.txt
+          python run_processing_job.py

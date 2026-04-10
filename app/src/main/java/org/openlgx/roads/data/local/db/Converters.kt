@@ -58,7 +58,11 @@ class Converters {
 
     @TypeConverter
     fun toSessionProcessingState(value: String): SessionProcessingState =
-        SessionProcessingState.valueOf(value)
+        try {
+            SessionProcessingState.valueOf(value)
+        } catch (_: IllegalArgumentException) {
+            SessionProcessingState.NOT_STARTED
+        }
 
     @TypeConverter
     fun fromSessionHostedPipelineState(value: SessionHostedPipelineState): String = value.name
