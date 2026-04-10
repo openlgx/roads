@@ -79,7 +79,10 @@ Diagnostics shows export root path, last export path/time/success/error, and DB-
 | Signed release APK | `.\gradlew.bat :app:assembleRelease` (requires signing; see below) | `app\build\outputs\apk\release\app-release.apk` |
 | Unit tests | `.\gradlew.bat :app:testDebugUnitTest` | — |
 
-**Crash shortly after launch (hosted upload / WorkManager):** `@HiltWorker` requires WorkManager to use `HiltWorkerFactory` from `RoadsApplication`. The manifest disables the default `WorkManagerInitializer` so initialization goes through `Configuration.Provider`. If you still see immediate exits, capture **logcat** around `AndroidRuntime` / `WorkManager` / `Hilt`.
+**Crash shortly after launch (hosted upload / WorkManager / Room):**
+- **WorkManager:** `HiltWorkerFactory` is supplied via `Configuration.Provider` using a Hilt **entry point** (avoids `lateinit` before injection). The manifest removes the default `WorkManagerInitializer`.
+- **Room:** Only **v3→v4→v5** migrations exist. Local DB **v1 or v2** is upgraded with **destructive** reset (see `DatabaseModule`); v3+ keeps data.
+- If issues persist, capture **logcat** for `AndroidRuntime`, `WorkManager`, `Hilt`, `Room`.
 
 **Prerequisites:** Android SDK; **JDK 17** (Android Studio’s bundled runtime is fine); `local.properties` with `sdk.dir` (Android Studio creates this on first open).
 

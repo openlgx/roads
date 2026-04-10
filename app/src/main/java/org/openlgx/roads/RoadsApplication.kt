@@ -1,22 +1,28 @@
 package org.openlgx.roads
 
 import android.app.Application
-import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
-import javax.inject.Inject
+import org.openlgx.roads.di.HiltWorkerFactoryEntryPoint
 import org.openlgx.roads.di.PassiveCollectionEntryPoint
 import timber.log.Timber
 
 @HiltAndroidApp
 class RoadsApplication : Application(), Configuration.Provider {
 
-    @Inject
-    lateinit var workerFactory: HiltWorkerFactory
+    /**
+     * WorkManager can call [workManagerConfiguration] before field injection on [Application] runs.
+     * Resolve the factory via an entry point and cache a single [Configuration] instance.
+     */
+    private val workManagerConfig: Configuration by lazy {
+        val factory = EntryPointAccessors.fromApplication(this, HiltWorkerFactoryEntryPoint::class.java)
+            .hiltWorkerFactory()
+        Configuration.Builder().setWorkerFactory(factory).build()
+    }
 
     override val workManagerConfiguration: Configuration
-        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
+        get() = workManagerConfig
 
     override fun onCreate() {
         super.onCreate()

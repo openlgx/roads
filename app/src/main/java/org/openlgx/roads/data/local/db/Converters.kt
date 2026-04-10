@@ -16,25 +16,45 @@ class Converters {
     fun fromSessionState(value: SessionState): String = value.name
 
     @TypeConverter
-    fun toSessionState(value: String): SessionState = SessionState.valueOf(value)
+    fun toSessionState(value: String): SessionState =
+        try {
+            SessionState.valueOf(value)
+        } catch (_: IllegalArgumentException) {
+            SessionState.COMPLETED
+        }
 
     @TypeConverter
     fun fromRecordingSource(value: RecordingSource): String = value.name
 
     @TypeConverter
-    fun toRecordingSource(value: String): RecordingSource = RecordingSource.valueOf(value)
+    fun toRecordingSource(value: String): RecordingSource =
+        try {
+            RecordingSource.valueOf(value)
+        } catch (_: IllegalArgumentException) {
+            RecordingSource.AUTO
+        }
 
     @TypeConverter
     fun fromSessionUploadState(value: SessionUploadState): String = value.name
 
     @TypeConverter
-    fun toSessionUploadState(value: String): SessionUploadState = SessionUploadState.valueOf(value)
+    fun toSessionUploadState(value: String): SessionUploadState =
+        try {
+            SessionUploadState.valueOf(value)
+        } catch (_: IllegalArgumentException) {
+            SessionUploadState.NOT_QUEUED
+        }
 
     @TypeConverter
     fun fromBatchUploadState(value: BatchUploadState): String = value.name
 
     @TypeConverter
-    fun toBatchUploadState(value: String): BatchUploadState = BatchUploadState.valueOf(value)
+    fun toBatchUploadState(value: String): BatchUploadState =
+        try {
+            BatchUploadState.valueOf(value)
+        } catch (_: IllegalArgumentException) {
+            BatchUploadState.PENDING_POLICY
+        }
 
     @TypeConverter
     fun fromRoadEligibilityDisposition(value: RoadEligibilityDisposition): String = value.name
@@ -51,7 +71,12 @@ class Converters {
     fun fromAnomalyType(value: AnomalyType): String = value.name
 
     @TypeConverter
-    fun toAnomalyType(value: String): AnomalyType = AnomalyType.valueOf(value)
+    fun toAnomalyType(value: String): AnomalyType =
+        try {
+            AnomalyType.valueOf(value)
+        } catch (_: IllegalArgumentException) {
+            AnomalyType.UNKNOWN_EXPERIMENTAL
+        }
 
     @TypeConverter
     fun fromSessionProcessingState(value: SessionProcessingState): String = value.name
