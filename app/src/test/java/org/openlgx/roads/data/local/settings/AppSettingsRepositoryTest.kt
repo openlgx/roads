@@ -75,7 +75,7 @@ class AppSettingsRepositoryTest {
         }
 
     @Test
-    fun pilotBootstrapIsOneShot() =
+    fun pilotBootstrapIsOneShotPerContentVersion() =
         runBlocking {
             val repo = createRepository()
             val first =
@@ -93,6 +93,11 @@ class AppSettingsRepositoryTest {
             assertThat(s.pilotBootstrapApplied).isTrue()
             assertThat(s.uploadCouncilSlug).isEqualTo("c")
             assertThat(s.uploadBaseUrl).endsWith("/functions/v1")
+            assertThat(s.uploadWifiOnly).isFalse()
+            assertThat(s.uploadAllowCellular).isTrue()
+            assertThat(s.uploadRoadPackRequiredForAutoUpload).isFalse()
+            assertThat(s.uploadRoadFilterEnabled).isFalse()
+            assertThat(s.uploadPauseOnLowBatteryEnabled).isFalse()
 
             val second =
                 repo.applyPilotBootstrapIfNeverApplied(
@@ -106,5 +111,23 @@ class AppSettingsRepositoryTest {
                 )
             assertThat(second).isFalse()
             assertThat(repo.settings.first().uploadCouncilSlug).isEqualTo("c")
+        }
+
+    @Test
+    fun pilotBootstrapEnablesUploadWhenKeyPresent() =
+        runBlocking {
+            val repo = createRepository()
+            repo.applyPilotBootstrapIfNeverApplied(
+                label = "t",
+                baseUrl = "https://x.supabase.co",
+                councilSlug = "c",
+                projectSlug = "p",
+                projectId = "proj",
+                deviceId = "dev",
+                uploadApiKey = "olgx_du_testkey",
+            )
+            val s = repo.settings.first()
+            assertThat(s.uploadEnabled).isTrue()
+            assertThat(s.uploadApiKey).isEqualTo("olgx_du_testkey")
         }
 }

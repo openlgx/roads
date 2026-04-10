@@ -2,7 +2,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { extractBearer, verifyApiKeyByHash } from "../_shared/auth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse } from "../_shared/errors.ts";
-import { requireEnv } from "../_shared/env.ts";
+import {
+  requirePublishedBucket,
+  requireSupabaseProjectUrl,
+  requireSupabaseServiceKey,
+} from "../_shared/env.ts";
 import { createSql } from "../_shared/neon.ts";
 import { publishedConsensusGeoJsonKey } from "../_shared/paths.ts";
 
@@ -20,8 +24,9 @@ Deno.serve(async (req) => {
     return errorResponse("bad_request", "councilSlug query required", 400);
   }
 
-  const sql = createSql();
+  let sql: ReturnType<typeof createSql> | undefined;
   try {
+    sql = createSql();
     const apiKey = extractBearer(req);
     if (!apiKey) return errorResponse("unauthorized", "Missing API key", 401);
 
@@ -39,11 +44,11 @@ Deno.serve(async (req) => {
       return errorResponse("forbidden", "Key not scoped to this council", 403);
     }
 
-    const bucket = requireEnv("SUPABASE_PUBLISHED_BUCKET");
+    const bucket = requirePublishedBucket();
     const objectKey = publishedConsensusGeoJsonKey(councilSlug);
 
-    const supabaseUrl = requireEnv("SUPABASE_PROJECT_URL").replace(/\/$/, "");
-    const serviceKey = requireEnv("SUPABASE_SECRET_KEY");
+    const supabaseUrl = requireSupabaseProjectUrl().replace(/\/$/, "");
+    const serviceKey = requireSupabaseServiceKey();
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -65,6 +70,6 @@ Deno.serve(async (req) => {
       500,
     );
   } finally {
-    await sql.end({ timeout: 5 });
+    await sql?.end({ timeout: 5 }).catch(() => {});
   }
 });

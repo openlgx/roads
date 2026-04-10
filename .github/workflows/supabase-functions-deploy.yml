@@ -21,4 +21,5 @@ jobs:
             echo "Skipping deploy: add repo secrets SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF."
             exit 0
           fi
+          # Deploys every directory under supabase/functions/ (uploads-*, council-layers-*, healthz).
           supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"

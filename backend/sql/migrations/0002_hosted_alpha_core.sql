@@ -136,17 +136,39 @@ CREATE INDEX IF NOT EXISTS idx_recording_sessions_client_uuid ON recording_sessi
 CREATE INDEX IF NOT EXISTS idx_recording_sessions_upload_state ON recording_sessions (upload_state);
 CREATE INDEX IF NOT EXISTS idx_recording_sessions_processing_state ON recording_sessions (processing_state);
 
-ALTER TABLE artifacts
-    ADD CONSTRAINT fk_artifacts_recording_session
-    FOREIGN KEY (recording_session_id) REFERENCES recording_sessions (id) ON DELETE SET NULL;
+-- Re-runnable: skip when constraint already present (partially applied or legacy DBs).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'fk_artifacts_recording_session'
+  ) THEN
+    ALTER TABLE artifacts
+      ADD CONSTRAINT fk_artifacts_recording_session
+      FOREIGN KEY (recording_session_id) REFERENCES recording_sessions (id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
-ALTER TABLE recording_sessions
-    ADD CONSTRAINT fk_recording_sessions_raw_artifact
-    FOREIGN KEY (raw_artifact_id) REFERENCES artifacts (id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'fk_recording_sessions_raw_artifact'
+  ) THEN
+    ALTER TABLE recording_sessions
+      ADD CONSTRAINT fk_recording_sessions_raw_artifact
+      FOREIGN KEY (raw_artifact_id) REFERENCES artifacts (id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
-ALTER TABLE recording_sessions
-    ADD CONSTRAINT fk_recording_sessions_filtered_artifact
-    FOREIGN KEY (filtered_artifact_id) REFERENCES artifacts (id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'fk_recording_sessions_filtered_artifact'
+  ) THEN
+    ALTER TABLE recording_sessions
+      ADD CONSTRAINT fk_recording_sessions_filtered_artifact
+      FOREIGN KEY (filtered_artifact_id) REFERENCES artifacts (id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS upload_jobs (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

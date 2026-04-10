@@ -30,11 +30,13 @@ backend/.env.local
 .env
 .env.local
 
-# Supabase CLI local link state (may contain project URLs; keep out of git)
+# Supabase CLI local link state (may contain project refs; keep out of git)
 supabase/.temp/
+backend/supabase/.temp/
 
 # Python offline analysis (local outputs / venv)
 analysis_output/
+.venv/
 .venv_analysis/
 **/__pycache__/
 *.py[cod]

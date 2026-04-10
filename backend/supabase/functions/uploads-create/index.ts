@@ -2,7 +2,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 import { extractBearer, verifyApiKeyByHash } from "../_shared/auth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse } from "../_shared/errors.ts";
-import { requireEnv } from "../_shared/env.ts";
+import {
+  requireRawBucket,
+  requireSupabaseProjectUrl,
+  requireSupabaseServiceKey,
+} from "../_shared/env.ts";
 import { jsonResponse } from "../_shared/json.ts";
 import { createSql } from "../_shared/neon.ts";
 import { filteredSessionZipKey, rawSessionZipKey } from "../_shared/paths.ts";
@@ -33,8 +37,9 @@ Deno.serve(async (req) => {
     return errorResponse("method_not_allowed", "POST only", 405);
   }
 
-  const sql = createSql();
+  let sql: ReturnType<typeof createSql> | undefined;
   try {
+    sql = createSql();
     const apiKey = extractBearer(req);
     if (!apiKey) {
       return errorResponse("unauthorized", "Missing API key", 401);
@@ -127,7 +132,7 @@ Deno.serve(async (req) => {
         sessionUuid,
       });
 
-    const bucket = requireEnv("SUPABASE_RAW_BUCKET");
+    const bucket = requireRawBucket();
 
     let recording = await sql<{ id: string }[]>`
       SELECT id FROM recording_sessions
@@ -180,8 +185,8 @@ Deno.serve(async (req) => {
       UPDATE recording_sessions SET upload_state = 'QUEUED', updated_at = now()
       WHERE id = ${recordingSessionId}::uuid`;
 
-    const supabaseUrl = requireEnv("SUPABASE_PROJECT_URL").replace(/\/$/, "");
-    const serviceKey = requireEnv("SUPABASE_SECRET_KEY");
+    const supabaseUrl = requireSupabaseProjectUrl().replace(/\/$/, "");
+    const serviceKey = requireSupabaseServiceKey();
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -242,6 +247,6 @@ Deno.serve(async (req) => {
       500,
     );
   } finally {
-    await sql.end({ timeout: 5 });
+    await sql?.end({ timeout: 5 }).catch(() => {});
   }
 });

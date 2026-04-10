@@ -2,6 +2,8 @@
 
 This guide is for **operators and contributors** wiring the ingestion/publish stack. The Android app **never** receives Neon database credentials; it only needs **`uploadBaseUrl`** (Supabase functions base) and a **`DEVICE_UPLOAD`** API key (see security notes).
 
+**Single-day pilot:** follow the numbered PowerShell path in [pilot-readiness.md](pilot-readiness.md) (`apply_neon_migrations` → `seed_pilot_council` → deploy → `pilot_preflight` → `pilot_smoke_e2e` → device → processing → publish → manifest).
+
 ---
 
 ## Architecture summary
@@ -94,9 +96,11 @@ Typical secrets:
 From repo root (adapt for your shell):
 
 ```powershell
-# Example: psql against Neon (set DATABASE_URL first)
-psql $env:DATABASE_URL -f backend/sql/migrations/0001_extensions.sql
+# Applies 0001 → 0003 in order using backend/.env.local (python-dotenv)
+python backend/scripts/apply_neon_migrations.py
 ```
+
+Alternatively, run each file in order with `psql` against Neon.
 
 Or use `backend/scripts/validate-migrations.ps1` for syntax smoke (see workflow `migration-check.yml`).
 
@@ -104,21 +108,42 @@ Or use `backend/scripts/validate-migrations.ps1` for syntax smoke (see workflow 
 
 ## Edge Functions deploy
 
+**CLI project root** is `backend/supabase` (where `config.toml` lives). This matches GitHub Actions job `working-directory: backend/supabase` in `.github/workflows/supabase-functions-deploy.yml`, which runs `supabase functions deploy --project-ref …` to push **all** function folders under `backend/supabase/functions/` (for example `uploads-create`, `uploads-complete`, `healthz`, `council-layers-manifest`, `council-layers-roughness`, `council-layers-anomalies`, `council-layers-consensus`).
+
+### Bash (repo root)
+
 ```bash
-cd backend
+cd backend/supabase
 supabase link --project-ref <ref>
-supabase functions deploy uploads-create
-supabase functions deploy uploads-complete
-supabase functions deploy healthz
-supabase functions deploy council-layers-manifest
-supabase functions deploy council-layers-roughness
-supabase functions deploy council-layers-anomalies
-supabase functions deploy council-layers-consensus
+supabase functions deploy --project-ref <ref>
 ```
 
-Configure function secrets in Supabase dashboard: `DATABASE_URL_POOLED`, `SUPABASE_SECRET_KEY`, `SUPABASE_PROJECT_URL`, bucket names.
+### PowerShell (repo root)
 
-`backend/supabase/config.toml` sets `verify_jwt = false` because auth is **API key to Neon**, not Supabase JWT (review before production hardening).
+```powershell
+Set-Location backend\supabase
+supabase link --project-ref <ref>
+supabase functions deploy --project-ref <ref>
+```
+
+### Per-function deploy (optional)
+
+If you prefer explicit names (same directory as above):
+
+```bash
+cd backend/supabase
+supabase functions deploy uploads-create --project-ref <ref>
+supabase functions deploy uploads-complete --project-ref <ref>
+supabase functions deploy healthz --project-ref <ref>
+supabase functions deploy council-layers-manifest --project-ref <ref>
+supabase functions deploy council-layers-roughness --project-ref <ref>
+supabase functions deploy council-layers-anomalies --project-ref <ref>
+supabase functions deploy council-layers-consensus --project-ref <ref>
+```
+
+Configure **every** deployed function’s secrets in the Supabase dashboard or CLI. **Minimum Neon:** `DATABASE_URL` or `DATABASE_URL_POOLED` (without this, `healthz` returns **503**). **Storage / Supabase JS client:** the CLI **refuses** custom secret names that start with `SUPABASE_` (except platform-managed keys). Edge code therefore resolves, in order: `SUPABASE_SECRET_KEY` **or** auto-injected `SUPABASE_SERVICE_ROLE_KEY`; `SUPABASE_PROJECT_URL` **or** `SUPABASE_URL`; `SUPABASE_RAW_BUCKET` **or** `RAW_BUCKET`; `SUPABASE_PUBLISHED_BUCKET` **or** `PUBLISHED_BUCKET`. For CLI `secrets set`, put bucket names in `RAW_BUCKET` and `PUBLISHED_BUCKET` (matching the values in `backend/.env.local` for the `SUPABASE_*_BUCKET` variables). Without these, upload and council-layer handlers fail at runtime.
+
+`backend/supabase/config.toml` uses one `[functions.<name>]` table per function with `verify_jwt = false` (current CLI rejects a global `[functions] verify_jwt = …` bool). Auth is **API key to Neon**, not Supabase JWT (review before production hardening).
 
 ---
 
@@ -154,14 +179,29 @@ Configure function secrets in Supabase dashboard: `DATABASE_URL_POOLED`, `SUPABA
 1. Run SQL migrations on Neon branch.
 2. Create buckets and Edge secrets.
 3. Deploy functions; smoke `healthz`.
-4. Seed **council**, **project**, **device**, **lga_boundaries** (real boundary required before publish). Automatable path: `python backend/scripts/seed_pilot_council.py` (see [pilot-readiness.md](pilot-readiness.md)).
-5. Run `python backend/scripts/pilot_preflight.py --council-slug <slug>`.
-6. Issue **DEVICE_UPLOAD** key to the app; **COUNCIL_READ** for GIS consumers.
-7. Build and register **road pack** (`roadpack-build`) before expecting road-filtered uploads.
+4. **Seed one pilot council in Neon** (see below): real LGA boundary GeoJSON, canonical road-pack storage key, device row, API keys. Script: `backend/scripts/seed_pilot_council.py` — full operator walkthrough in [pilot-readiness.md](pilot-readiness.md).
+5. Run `python backend/scripts/pilot_preflight.py --council-slug <slug>` (no `--skip-db` until the row checks pass).
+6. Give the printed **DEVICE_UPLOAD** secret to the app once; store **COUNCIL_READ** for GIS consumers (password manager).
+7. **Produce the real GeoJSON pack:** run `backend/roadpack-build/build_road_pack.py` after the boundary exists (uploads to Storage and upserts `road_packs`, including checksum). Until then, preflight may warn about `seed-placeholder-checksum`.
 8. **Sideload on device:** copy `public-roads.geojson` into app-private storage  
    `filesDir/road_packs/{councilSlug}/{version}/public-roads.geojson`  
-   (same path shape as the Storage key, under the app sandbox). Optional `pack.json` in that folder may include `"version"`. The app picks the **lexicographically last** version directory name when multiple exist.
+   (same path segments as the Storage object key, under the app sandbox). Optional `pack.json` in that folder may include `"version"`. The app picks the **lexicographically last** version directory name when multiple exist.
 9. Field-test signed PUT size/latency on target devices.
+
+### Pilot seed: one council (contract you must not drift from)
+
+The hosted alpha stack assumes **exactly this** raw-object layout for the road pack (same as `build_road_pack.py`):
+
+`roadpacks/<council-slug>/<road-pack-version>/public-roads.geojson`
+
+- **`--council-slug`** and **`--project-slug`:** lowercase, digits, single hyphens (e.g. `bayside`, `alpha`). The script rejects empty or sloppy slugs.
+- **`--boundary-geojson`:** one Polygon or MultiPolygon in WGS84 (EPSG:4326), either root geometry or a **single-feature** `FeatureCollection`. The script checks ring size, non-empty rings, and longitude/latitude ranges.
+- **`--road-pack-storage-key`:** must **equal** `roadpacks/<same-council-slug>/<same-version>/public-roads.geojson` (no alternate prefixes in this pilot slice).
+- **`--road-pack-version`:** must match the `<version>` segment above (e.g. `1.0.0`).
+- **`--stable-install-id`:** non-empty; must match how the device row is keyed (`devices.stable_install_id`, unique per project). If this is wrong, upload auth will not line up with the seeded device.
+- **`DATABASE_URL`** (or `DATABASE_URL_POOLED`) must be set (typically `backend/.env.local`).
+
+After a successful run, the script prints **council slug, project slug, both API keys, road-pack version, storage key, UUIDs**, and **copy-paste next commands** (`pilot_preflight`, `pilot_smoke_e2e`).
 
 ---
 

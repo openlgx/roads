@@ -1,7 +1,11 @@
 import { extractBearer, verifyApiKeyByHash } from "../_shared/auth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { errorResponse } from "../_shared/errors.ts";
-import { requireEnv } from "../_shared/env.ts";
+import {
+  requireRawBucket,
+  requireSupabaseProjectUrl,
+  requireSupabaseServiceKey,
+} from "../_shared/env.ts";
 import { jsonResponse } from "../_shared/json.ts";
 import { createSql } from "../_shared/neon.ts";
 import { verifyStorageObjectSize } from "../_shared/storage_object.ts";
@@ -29,8 +33,9 @@ Deno.serve(async (req) => {
     return errorResponse("method_not_allowed", "POST only", 405);
   }
 
-  const sql = createSql();
+  let sql: ReturnType<typeof createSql> | undefined;
   try {
+    sql = createSql();
     const apiKey = extractBearer(req);
     if (!apiKey) {
       return errorResponse("unauthorized", "Missing API key", 401);
@@ -145,11 +150,11 @@ Deno.serve(async (req) => {
       return errorResponse("forbidden", "Key not scoped to this project", 403);
     }
 
-    const bucket = requireEnv("SUPABASE_RAW_BUCKET");
+    const bucket = requireRawBucket();
     const kind = job.artifact_kind ?? "RAW_UPLOAD";
 
-    const supabaseUrl = requireEnv("SUPABASE_PROJECT_URL").replace(/\/$/, "");
-    const serviceKey = requireEnv("SUPABASE_SECRET_KEY");
+    const supabaseUrl = requireSupabaseProjectUrl().replace(/\/$/, "");
+    const serviceKey = requireSupabaseServiceKey();
     try {
       await verifyStorageObjectSize(
         supabaseUrl,
@@ -243,6 +248,6 @@ Deno.serve(async (req) => {
       500,
     );
   } finally {
-    await sql.end({ timeout: 5 });
+    await sql?.end({ timeout: 5 }).catch(() => {});
   }
 });

@@ -88,15 +88,18 @@ android {
         }
     }
 
+    val pilotUploadKeyForBuildConfig = escapeForBuildConfigString(resolvePilotUploadKey())
+    val pilotBootstrapLabelDebug =
+        escapeForBuildConfigString("${defaultConfig.versionName}-debug")
+    val pilotBootstrapLabelRelease =
+        escapeForBuildConfigString("${defaultConfig.versionName}-release")
+
     buildTypes {
         debug {
             isDebuggable = true
-            val pilotKey = escapeForBuildConfigString(resolvePilotUploadKey())
             buildConfigField("Boolean", "PILOT_BOOTSTRAP_ENABLED", "true")
-            buildConfigField("String", "PILOT_UPLOAD_API_KEY", "\"$pilotKey\"")
-            val pilotLabel =
-                escapeForBuildConfigString("${defaultConfig.versionName}-debug")
-            buildConfigField("String", "PILOT_BOOTSTRAP_LABEL", "\"$pilotLabel\"")
+            buildConfigField("String", "PILOT_UPLOAD_API_KEY", "\"$pilotUploadKeyForBuildConfig\"")
+            buildConfigField("String", "PILOT_BOOTSTRAP_LABEL", "\"$pilotBootstrapLabelDebug\"")
         }
         release {
             isMinifyEnabled = false
@@ -104,9 +107,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            buildConfigField("Boolean", "PILOT_BOOTSTRAP_ENABLED", "false")
-            buildConfigField("String", "PILOT_UPLOAD_API_KEY", "\"\"")
-            buildConfigField("String", "PILOT_BOOTSTRAP_LABEL", "\"\"")
+            buildConfigField("Boolean", "PILOT_BOOTSTRAP_ENABLED", "true")
+            buildConfigField("String", "PILOT_UPLOAD_API_KEY", "\"$pilotUploadKeyForBuildConfig\"")
+            buildConfigField("String", "PILOT_BOOTSTRAP_LABEL", "\"$pilotBootstrapLabelRelease\"")
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }

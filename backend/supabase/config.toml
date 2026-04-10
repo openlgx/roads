@@ -1,8 +1,27 @@
 # Supabase CLI — run `supabase link` from `backend/supabase` with your project ref.
 # Do not commit secrets; use Dashboard or `supabase secrets set`.
+# Per-function verify_jwt (CLI expects a table per function, not a global bool).
 
 [api]
 enabled = true
 
-[functions]
+[functions.healthz]
+verify_jwt = false
+
+[functions.uploads-create]
+verify_jwt = false
+
+[functions.uploads-complete]
+verify_jwt = false
+
+[functions.council-layers-manifest]
+verify_jwt = false
+
+[functions.council-layers-roughness]
+verify_jwt = false
+
+[functions.council-layers-anomalies]
+verify_jwt = false
+
+[functions.council-layers-consensus]
 verify_jwt = false

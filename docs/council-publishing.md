@@ -70,6 +70,10 @@ Deterministic key ordering inside `layerArtifacts` is recommended but not requir
 
 **Pilot URLs, key handling, and refresh expectations:** [pilot-readiness.md](pilot-readiness.md) (GIS validation section).
 
+### After a successful publish
+
+From the same machine that has `backend/.env.local`, run `python backend/scripts/pilot_smoke_e2e.py --council-slug <slug> --require-published` with **`PILOT_COUNCIL_READ_KEY`** (and upload key env vars if you want the full upload path in the same run). **Pass** means manifest and layer checks report HTTP 200 (see script summary block). **Fail** is non-zero exit with `FAIL …` lines (missing manifest or GeoJSON objects in Storage surface as HTTP 404 from the Edge functions).
+
 ---
 
 ## Related

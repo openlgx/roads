@@ -158,6 +158,21 @@ Exact query parameters are defined alongside the Edge Function source under `bac
 
 ---
 
+## Operator validation (pilot smoke)
+
+The repo script `backend/scripts/pilot_smoke_e2e.py` exercises this contract against a live project (no new HTTP features; it is a client-style probe).
+
+| Check | Expected signal |
+|-------|-----------------|
+| Wrong `COUNCIL_READ` / bogus Bearer on manifest | **HTTP 401** (`council_read_key_rejected` line) |
+| Valid `COUNCIL_READ` on manifest | **HTTP 200** JSON with `manifestVersion`, `councilSlug`, `publishedAt`, `publishRunId`, `layerArtifacts`, or **HTTP 404** if publish has not written `manifest.json` yet (see `--require-published`; script also prints `council_read_key_accepted` when auth succeeds for 200/404) |
+| Layer GETs (`council-layers-roughness`, …) | **HTTP 200** after redirects when objects exist, else **404** |
+| `uploads-create` + Storage PUT + `uploads-complete` | **HTTP 200** on create/complete; response includes `artifactId`; `processingJobId` set when a new `processing_jobs` row is created |
+
+Full operator sequence, Windows PowerShell examples, and pass/fail summary semantics: [pilot-readiness.md](pilot-readiness.md).
+
+---
+
 ## Related
 
 - [docs/setup-hosted-alpha.md](setup-hosted-alpha.md) — secrets, CLI, rotation

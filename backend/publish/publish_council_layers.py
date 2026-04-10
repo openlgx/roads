@@ -91,7 +91,11 @@ def publish_council(cur, conn, council_id: str, council_slug: str, publisher_ver
                 ),
             ),
         )
-        print(f"SKIP council {council_slug}: no boundary (fail-closed)")
+        print(
+            f"FAIL-CLOSED council {council_slug}: no authoritative LGA geometry in lga_boundaries — "
+            "nothing written to published bucket (see seed_pilot_council / boundary import).",
+            file=sys.stderr,
+        )
         return
 
     boundary = shapely_boundary_from_geojson(geojson_txt)

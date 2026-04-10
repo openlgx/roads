@@ -1,135 +1,192 @@
 # Pilot readiness — one council, one device (hosted alpha)
 
-This pack describes how to run **one** real council pilot with the current stack: Android local-first collector, Neon metadata/jobs, Supabase Storage + Edge Functions, GitHub Actions for processing/publish.
+Single-council field pilot: **Android** (local-first) + **Neon** (metadata/jobs) + **Supabase** (Storage + Edge Functions) + **GitHub Actions** (processing/publish). Not multi-council production.
 
-It is **not** multi-council production, calibrated IRI, or fleet scale-out.
+**Canonical operator path (Windows PowerShell, repo root):** run the numbered steps in [Tomorrow — one straight line](#tomorrow--one-straight-line-powershell) after prerequisites.
 
 ---
 
 ## What is ready for pilot
 
-- **Android:** Room v6 (hosted pipeline + upload skip metadata); WorkManager upload with road-pack filtering; Settings diagnostics (no secrets); session detail operator state for hosted path.
-- **Backend:** `uploads-create` / `uploads-complete` (complete verifies object exists in Storage and matches declared byte size); council layer Edge functions; publish script LGA-clipped and **fail-closed** without boundary.
-- **Tooling:** `backend/scripts/pilot_preflight.py`, `pilot_smoke_e2e.py`, `seed_pilot_council.py`; `backend/.env.example` for operator setup.
-
-## What stays experimental / not production-ready
-
-- Roughness / anomaly outputs are **heuristic**, not IRI or certified condition scores.
-- Consensus layers use a **density gate**; sparse pilots may see empty consensus while roughness/anomalies still emit.
-- Edge cold starts, Storage latency, and GitHub schedule jitter mean council layers are **eventually consistent**, not real-time.
-- **FlatGeobuf** for published layers is **not** emitted in this slice; use GeoJSON URLs from the manifest.
+- **Android:** Room v6 hosted pipeline + WorkManager upload; road-pack gate for auto-upload; Settings diagnostics (no secrets); session detail hosted hints.
+- **Backend:** `uploads-create` / `uploads-complete` (storage verified on complete); council layer functions; `publish_council_layers.py` **fail-closed** without LGA boundary; outputs remain LGA-clipped / council-scoped by design.
+- **Scripts:** `apply_neon_migrations.py` (ordered `backend/sql/migrations`, tracks applied files), `seed_pilot_council.py`, `issue_device_upload_key.py` (new **DEVICE_UPLOAD** when seed plaintext was lost), `pilot_preflight.py`, `pilot_smoke_e2e.py`.
 
 ---
 
-## Operator checklist (before testers install the APK)
+## What stays experimental
 
-1. **Neon:** Apply SQL migrations under `backend/sql/migrations/` to the target branch.
-2. **Seed pilot rows:** Run `backend/scripts/seed_pilot_council.py` with a real LGA GeoJSON boundary (WGS84 Polygon/MultiPolygon). Store printed API keys in a password manager. **Rotate** any key ever pasted into chat, screenshots, or committed files.
-3. **Supabase:** Private buckets for raw + published; Edge Functions deployed with the same env names as `backend/.env.example`.
-4. **Road pack:** Build or import GeoJSON; register `storage_key` in `road_packs`; place a copy on device at `files/road_packs/<council_slug>/<version>/public-roads.geojson` (ADB `run-as` or device file copy). See [road-filtering.md](road-filtering.md).
-5. **Android:** Set `uploadBaseUrl` (e.g. `https://<ref>.supabase.co/functions/v1`), `uploadApiKey` (DEVICE_UPLOAD plaintext), `uploadProjectId`, `uploadDeviceId`, `uploadCouncilSlug` via your secure provisioning path (not in source control). Use **Apply recommended pilot upload defaults** in Settings as a starting point, then enable **Hosted upload** when ready.
-6. **Verify:** `python backend/scripts/pilot_preflight.py` (with DB URL) and `python backend/scripts/pilot_smoke_e2e.py --council-slug <slug>`.
-7. **Secret hygiene:** **Never** put `DATABASE_URL`, `SUPABASE_SECRET_KEY`, or Neon credentials in the app. Testers only get **DEVICE_UPLOAD** + functions base URL + UUIDs.
+- Heuristic roughness/anomaly outputs (not IRI).
+- Consensus may be empty under density gates.
+- Layers refresh on publish schedule, not in real time after every drive.
 
 ---
 
-## Preflight and smoke commands
+## Prerequisites (once)
 
-From repo root (install Python deps as needed: `pip install python-dotenv httpx psycopg[binary]`).
+| Item | Notes |
+|------|--------|
+| `backend/.env.local` | From `backend/.env.example`; **never commit**. Scripts load it via `python-dotenv`. |
+| Python | `pip install python-dotenv httpx psycopg[binary]` |
+| Supabase CLI | For `supabase link` / `supabase functions deploy` from `backend\supabase` |
+| Neon branch | `DATABASE_URL` or `DATABASE_URL_POOLED` must point at the branch you migrate + seed |
 
-```bash
-# Env checks + DB seed/boundary/key rows (set DATABASE_URL in backend/.env.local)
-python backend/scripts/pilot_preflight.py --council-slug YOUR_SLUG
+Edge Function secrets (Dashboard → Edge Functions → Secrets, or `supabase secrets set`): Neon `DATABASE_URL` / `DATABASE_URL_POOLED`; service URL + service role are usually auto-injected as `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`. Bucket names: if the CLI rejects `SUPABASE_*` names, set **`RAW_BUCKET`** and **`PUBLISHED_BUCKET`** to the same values as in `backend/.env.local`. See [setup-hosted-alpha.md](setup-hosted-alpha.md). Do **not** paste these into the Android app.
 
-# Skip DB if you only want env/file sanity
-python backend/scripts/pilot_preflight.py --skip-db
+---
 
-# Edge + manifest contract (set PILOT_DEVICE_UPLOAD_KEY / PILOT_COUNCIL_READ_KEY or flags)
-python backend/scripts/pilot_smoke_e2e.py --council-slug YOUR_SLUG \
-  --device-upload-key "$PILOT_DEVICE_UPLOAD_KEY" \
-  --council-read-key "$PILOT_COUNCIL_READ_KEY"
+## Tomorrow — one straight line (PowerShell)
+
+From repository root (`c:\cursor-dev\roads` or your clone). Replace `YOUR_SLUG` and paths with your pilot values. **Do not** paste real keys into scripts committed to git; use env vars or the seed script output.
+
+### 1–3 — Database + seed + deploy
+
+```powershell
+# 1) Apply Neon migrations (reports applied vs already applied)
+python backend\scripts\apply_neon_migrations.py
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# 2) Seed one council (boundary GeoJSON + canonical road-pack key + keys) — example:
+# python backend\scripts\seed_pilot_council.py `
+#   --council-slug YOUR_SLUG `
+#   --council-name "Your Council Name" `
+#   --project-slug alpha `
+#   --boundary-geojson .\path\to\lga.geojson `
+#   --road-pack-version 1.0.0 `
+#   --road-pack-storage-key roadpacks/YOUR_SLUG/1.0.0/public-roads.geojson `
+#   --stable-install-id your-stable-device-id
+
+# 3) Deploy all Edge Functions (config.toml lives here)
+Set-Location backend\supabase
+supabase link --project-ref $env:SUPABASE_PROJECT_REF
+supabase functions deploy --project-ref $env:SUPABASE_PROJECT_REF
+Set-Location ..\..
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 ```
 
+If `SUPABASE_PROJECT_REF` is not in the environment, pass `--project-ref <ref>` explicitly (same ref as the Supabase project).
+
+### 4–5 — Preflight + smoke
+
+If you already have council/project/device rows but **lost the DEVICE_UPLOAD plaintext**, mint one (writes a new `api_keys` row; revokes prior active DEVICE_UPLOAD keys for that device):
+
+```powershell
+python backend\scripts\issue_device_upload_key.py
+# Add printed key to backend\.env.local as UPLOAD_API_KEY and PILOT_DEVICE_UPLOAD_KEY
+```
+
+```powershell
+python backend\scripts\pilot_preflight.py --council-slug YOUR_SLUG
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# Paste plaintext keys from seed output (or your password manager), then:
+$env:PILOT_DEVICE_UPLOAD_KEY = "olgx_du_..."   # DEVICE_UPLOAD from seed
+$env:PILOT_COUNCIL_READ_KEY = "olgx_cr_..."    # COUNCIL_READ from seed
+
+python backend\scripts\pilot_smoke_e2e.py --council-slug YOUR_SLUG
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# After first successful publish (step 10), prove manifest + layers 200:
+python backend\scripts\pilot_smoke_e2e.py --council-slug YOUR_SLUG --require-published
+```
+
+**Optional smoke modes**
+
+- DB-less preflight (env only): `python backend\scripts\pilot_preflight.py --skip-db`
+- No Storage PUT: `python backend\scripts\pilot_smoke_e2e.py --council-slug YOUR_SLUG --skip-upload-e2e`
+- Without device key, upload stages show **SKIP** (not FAIL).
+
+### 6–7 — Android + road pack + one session
+
+1. Install APK; open **Settings → Hosted alpha upload**.
+2. **Save hosted connection:** upload base URL (`https://<ref>.supabase.co/functions/v1`), DEVICE_UPLOAD key, council slug, project slug, **project id** and **device id** from seed output. Leaving the API key field blank keeps the previously saved key.
+3. Sideload road pack: `road_packs/<council_slug>/<version>/public-roads.geojson` under the app files dir (see [road-filtering.md](road-filtering.md)).
+4. Enable **Hosted upload** when ready; **Require road pack for auto-upload** remains on in recommended defaults — missing pack **fails closed** with a clear diagnostics error (not silent).
+5. Record one drive; confirm session **hosted** state and Settings **Last upload** lines.
+
+### 8–10 — Confirm upload, processing, publish
+
+1. **Neon / Storage:** operator confirms `upload_jobs` completed and object in raw bucket (see `docs/backend.md`).
+2. **Processing:** from repo root, `python backend\processing\run_processing_job.py` (loads `backend/.env.local`; repo root is on `sys.path`), or wait for GitHub Actions worker.
+3. **Publish:** `python backend\publish\publish_council_layers.py` from repo root (same `.env.local`). Without LGA geometry, publisher **fail-closed** (stderr message; no published writes for that council).
+
+### 11 — Manifest / GIS
+
+`GET {SUPABASE_PROJECT_URL}/functions/v1/council-layers-manifest?councilSlug=YOUR_SLUG` with header `Authorization: Bearer <COUNCIL_READ>`.
+
+Layer paths: `council-layers-roughness`, `council-layers-anomalies`, `council-layers-consensus` — same auth. Contract: [api-contract.md](api-contract.md).
+
 ---
 
-## One-session end-to-end (operator / developer)
+## Pass / fail signals
 
-1. **Device:** Complete a drive; confirm session shows hosted state progressing (or a clear failure reason in Settings diagnostics).
-2. **Neon:** Confirm `recording_sessions`, `upload_jobs` COMPLETED, `artifacts` row, `processing_jobs` lifecycle.
-3. **Processing:** Run `python backend/processing/run_processing_job.py` with env from `backend/.env.local` (or wait for GitHub Actions worker).
-4. **Publish:** Run `python backend/publish/publish_council_layers.py` (or scheduled workflow).
-5. **GIS:** Fetch manifest via `council-layers-manifest?councilSlug=…` with **COUNCIL_READ** Bearer key; confirm `publishedAt`, `publishRunId`, `layerArtifacts`, `consensusEmitted`, `refreshCadenceNote`.
+| Step | Pass | Fail |
+|------|------|------|
+| `apply_neon_migrations.py` | Exit **0**; summary `N applied, M already applied` | Exit **1**; connection or SQL error |
+| `pilot_preflight.py` | `SUMMARY: PASS` / `PILOT PREFLIGHT OK` | `SUMMARY: FAIL` bullet list; exit **1** |
+| `pilot_smoke_e2e.py` | `RESULT: OK`; stages 1–5 **PASS** lines | Any **FAIL** in summary; exit **1** |
+
+**Smoke stages (see script headings):**
+
+1. **healthz** — 200 (Neon up) or 503 (Edge up, Neon down).
+2. **Invalid manifest key** — 401, or SKIP when DB secrets missing on Edge.
+3. **Valid COUNCIL_READ** — manifest 200 or 404 (404 OK before first publish unless `--require-published`).
+4. **Layer endpoints** — 200 or 404 before publish.
+5. **uploads-create** → Storage PUT → **uploads-complete** — full E2E unless skipped.
+
+---
+
+## Seed script (contract)
+
+**Order:** migrations → ** seed** → **build_road_pack** (optional checksum refresh) → preflight → device.
+
+Storage key shape (must match `--council-slug` and `--road-pack-version`):
+
+`roadpacks/<council-slug>/<road-pack-version>/public-roads.geojson`
+
+```powershell
+pip install psycopg[binary] python-dotenv
+python backend\scripts\seed_pilot_council.py `
+  --council-slug bayside-vic-example `
+  --council-name "Bayside City Council (example)" `
+  --project-slug alpha `
+  --boundary-geojson .\pilot_boundary.geojson `
+  --road-pack-version 1.0.0 `
+  --road-pack-storage-key roadpacks/bayside-vic-example/1.0.0/public-roads.geojson `
+  --stable-install-id pixel-8-field-vehicle-01
+```
+
+Use your real slugs, boundary file, and **stable_install_id** matching the device row.
+
+---
+
+## Android build
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+.\gradlew.bat :app:assembleDebug
+```
 
 ---
 
 ## GIS consumption (QGIS / ArcGIS Pro)
 
-### Stable contract
+- **Manifest** and **layer** URLs require **COUNCIL_READ** (Bearer or `X-Api-Key` per function).
+- Use `publishedAt` / `publishRunId` from manifest for freshness.
+- QGIS: add HTTP(S) vector / protocol URL with headers as your QGIS version allows.
 
-- **Manifest:** `GET {SUPABASE_PROJECT_URL}/functions/v1/council-layers-manifest?councilSlug=<slug>`  
-  Header: `Authorization: Bearer <COUNCIL_READ plaintext key>` (or `X-Api-Key` per function CORS/auth docs).
-- **Layers (GeoJSON):** URLs are **not** anonymous; use the same read-only key as for the manifest. Layer function paths match `docs/api-contract.md` (`council-layers-roughness`, `council-layers-anomalies`, `council-layers-consensus`).
-- **Manifest JSON fields:** `manifestVersion`, `councilSlug`, `publishedAt`, `publishRunId`, `layerArtifacts` (per-layer `storageKey`, `byteSize`, `mimeType`, `schemaVersion`; consensus may include `omitted` + `note`), `consensusEmitted`, `disclaimer`, `refreshCadenceNote`, `sourceProcessingVersions`.
-
-### QGIS
-
-1. Add a **Vector Layer → HTTP/S** or use **Protocol** URL (depending on QGIS version) pointing at the **manifest** or **GeoJSON layer** URL with the key passed per server configuration or as documented in your Supabase/edge setup.
-2. Set refresh **manually** or on a timer; automated publish may run on a **~12 hour** schedule in alpha — “updates every 12 hours” means the **scheduled GitHub job** is the usual refresh driver, not the moment a car finishes a trip.
-
-### ArcGIS Pro
-
-1. Use **Add Data → From Path** / URL (or AGOL hosted layer workflow your council allows) with the HTTPS GeoJSON URL and HTTP header for the read key where supported; some setups require a small gateway — document the council’s IT constraint honestly.
-
-### Freshness
-
-- Use **`publishedAt`** and **`publishRunId`** in the manifest to confirm which publish produced the current tiles. If `publishedAt` is older than your last successful processing run, publish may not have run yet or failed (check `published_layer_runs` in Neon).
-
----
-
-## Seed script (one council)
-
-```bash
-cd backend
-pip install psycopg[binary] python-dotenv
-# Prepare pilot_boundary.geojson (authoritative LGA geometry)
-python scripts/seed_pilot_council.py \
-  --council-slug olgx-pilot \
-  --council-name "OLGX Pilot" \
-  --project-slug alpha \
-  --boundary-geojson ./pilot_boundary.geojson \
-  --road-pack-storage-key roadpacks/olgx-pilot/1.0.0/public-roads.geojson \
-  --stable-install-id pilot-device-001
-```
-
-Align `stable_install_id` with the app’s install/profile story when you issue the **DEVICE_UPLOAD** key scoped to the seeded device row.
-
----
-
-## Android build / schema
-
-- Compile: `./gradlew :app:compileDebugKotlin` (ensure `JAVA_HOME` is set on CI/CLI).
-- Room **v6** schema export: `app/schemas/org.openlgx.roads.data.local.db.RoadsDatabase/6.json` (regenerate via KSP when entities/migrations change).
-
----
-
-## Safeguards in this slice
-
-- **`uploads-complete`:** After metadata match, verifies the Storage object exists and **byte size** matches the upload job (ranged GET + `Content-Range` total).
-- **Auth:** Existing API-key hashing and project/device/council scoping on Edge functions remain the primary controls; there is **no** distributed rate limiter in this slice — size limits and scoped keys reduce abuse; document remaining limits honestly for councils.
+Details unchanged from prior revision: manifest fields and refresh cadence notes remain normative in [api-contract.md](api-contract.md) and [council-publishing.md](council-publishing.md).
 
 ---
 
 ## Files to keep out of git
 
-- `backend/.env.local`, any root `.env.local`, keystores, plaintext keys.
-- Follow [.gitignore](../.gitignore). **Rotate** credentials if they were ever committed or screenshotted.
+`backend/.env.local`, keystores, plaintext keys — see [.gitignore](../.gitignore). Rotate anything exposed.
 
 ---
 
-## Exact next step for first end-to-end pilot run
+## Related
 
-1. Seed Neon with **real** boundary + keys (`seed_pilot_council.py`).
-2. Deploy Edge functions + confirm buckets.
-3. Run `pilot_preflight.py` (no `--skip-db`).
-4. Configure one Android device + sideload road pack + enable upload in Settings.
-5. One drive → verify upload → run processing → run publish → open manifest in QGIS/ArcGIS as above.
+- [setup-hosted-alpha.md](setup-hosted-alpha.md) — stack + Edge secrets
+- [docs/backend.md](backend.md)
+- [docs/api-contract.md](api-contract.md)

@@ -100,9 +100,11 @@ interface AppSettingsRepository {
     )
 
     /**
-     * One-shot seed for alpha/debug builds: writes council URL/IDs and optional [uploadApiKey],
-     * applies recommended upload toggles, sets [AppSettings.pilotBootstrapApplied].
-     * @return true if this call performed the initial write.
+     * Seed for pilot builds: writes council URL/IDs and optional [uploadApiKey], applies
+     * field-trial upload toggles, bumps [AppSettings.pilotBootstrapApplied], and runs again when
+     * bootstrap content version in DataStore is behind (see implementation).
+     *
+     * @return true if this call applied an update.
      */
     suspend fun applyPilotBootstrapIfNeverApplied(
         label: String,

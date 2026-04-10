@@ -23,6 +23,10 @@ constructor(
         if (!BuildConfig.PILOT_BOOTSTRAP_ENABLED) return
         applicationScope.launch {
             runCatching {
+                val uploadKey =
+                    BuildConfig.PILOT_UPLOAD_API_KEY.trim().ifEmpty {
+                        PilotBootstrapConfig.HARDCODED_DEVICE_UPLOAD_API_KEY.trim()
+                    }
                 val applied =
                     appSettingsRepository.applyPilotBootstrapIfNeverApplied(
                         label = BuildConfig.PILOT_BOOTSTRAP_LABEL,
@@ -31,7 +35,7 @@ constructor(
                         projectSlug = PilotBootstrapConfig.PROJECT_SLUG,
                         projectId = PilotBootstrapConfig.PROJECT_ID,
                         deviceId = PilotBootstrapConfig.DEVICE_ID,
-                        uploadApiKey = BuildConfig.PILOT_UPLOAD_API_KEY,
+                        uploadApiKey = uploadKey,
                     )
                 if (applied) {
                     Timber.i("Pilot bootstrap applied (%s)", BuildConfig.PILOT_BOOTSTRAP_LABEL)

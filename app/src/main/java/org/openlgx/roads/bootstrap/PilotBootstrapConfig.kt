@@ -2,7 +2,8 @@ package org.openlgx.roads.bootstrap
 
 /**
  * Non-secret pilot council defaults for debug/alpha bootstrap (IDs + URLs are not service keys).
- * See README “Debug pilot bootstrap”.
+ * [HARDCODED_DEVICE_UPLOAD_API_KEY] is the optional alpha fallback when Gradle
+ * [BuildConfig.PILOT_UPLOAD_API_KEY] is empty (see README field-trial note).
  */
 object PilotBootstrapConfig {
     const val COUNCIL_SLUG: String = "yass-valley"
@@ -11,4 +12,12 @@ object PilotBootstrapConfig {
     const val DEVICE_ID: String = "63b3ac61-8f1e-40bf-b377-195565e9f886"
     const val UPLOAD_BASE_URL: String =
         "https://zwbjzyysplghkylryaby.supabase.co/functions/v1"
+
+    /**
+     * Plaintext **DEVICE_UPLOAD** for this device row in Neon (must match `api_keys` hash).
+     * Rotate: `python backend/scripts/issue_device_upload_key.py` then update this, `.env.local`,
+     * and `local.properties` together.
+     */
+    const val HARDCODED_DEVICE_UPLOAD_API_KEY: String =
+        "olgx_du_5AtJmgOjwMg9ddJwOtwHTbGLpoxawg9f"
 }

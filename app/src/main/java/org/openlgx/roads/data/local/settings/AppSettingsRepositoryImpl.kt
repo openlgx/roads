@@ -89,6 +89,7 @@ constructor(
         val latestHostedUploadAttemptSessionId = longPreferencesKey("hosted_upload_last_session_id")
         val pilotBootstrapApplied = booleanPreferencesKey("pilot_bootstrap_applied")
         val pilotBootstrapLabel = stringPreferencesKey("pilot_bootstrap_label")
+        val pilotBootstrapContentVersion = intPreferencesKey("pilot_bootstrap_content_version")
     }
 
     override val settings: Flow<AppSettings> =
@@ -354,7 +355,8 @@ constructor(
     ): Boolean {
         var appliedNow = false
         dataStore.edit { prefs ->
-            if (prefs[Keys.pilotBootstrapApplied] == true) return@edit
+            val currentVersion = prefs[Keys.pilotBootstrapContentVersion] ?: 0
+            if (currentVersion >= PILOT_BOOTSTRAP_LATEST_CONTENT_VERSION) return@edit
             prefs[Keys.pilotBootstrapApplied] = true
             prefs[Keys.pilotBootstrapLabel] = label.trim()
             prefs[Keys.uploadBaseUrl] = normalizeHostedUploadBaseUrl(baseUrl)
@@ -369,13 +371,17 @@ constructor(
             } else {
                 prefs[Keys.uploadEnabled] = false
             }
-            prefs[Keys.uploadWifiOnly] = true
-            prefs[Keys.uploadAllowCellular] = false
-            prefs[Keys.uploadChargingPreferred] = true
+            // Field-trial friendly: upload on cellular, no road-pack gate, no “wait for Wi-Fi”;
+            // avoid low-battery WorkManager constraint so drives still enqueue uploads.
+            prefs[Keys.uploadWifiOnly] = false
+            prefs[Keys.uploadAllowCellular] = true
+            prefs[Keys.uploadChargingPreferred] = false
+            prefs[Keys.uploadPauseOnLowBattery] = false
             prefs[Keys.uploadRetryLimit] = 3
             prefs[Keys.uploadAutoAfterSession] = true
-            prefs[Keys.uploadRoadFilterEnabled] = true
-            prefs[Keys.uploadRoadPackRequired] = true
+            prefs[Keys.uploadRoadFilterEnabled] = false
+            prefs[Keys.uploadRoadPackRequired] = false
+            prefs[Keys.pilotBootstrapContentVersion] = PILOT_BOOTSTRAP_LATEST_CONTENT_VERSION
             appliedNow = true
         }
         return appliedNow
@@ -472,6 +478,12 @@ constructor(
         const val DEFAULT_PROCESSING_LIVE_AFTER_SESSION = true
         const val DEFAULT_PROCESSING_ALL_RUNS_OVERLAY = true
         const val DEFAULT_UPLOAD_ROAD_FILTER_DISTANCE_M = 40f
+
+        /**
+         * Bump when pilot bootstrap defaults change so existing installs pick up new toggles
+         * (URLs/IDs/key come from the bootstrap call each time version is behind).
+         */
+        const val PILOT_BOOTSTRAP_LATEST_CONTENT_VERSION: Int = 3
 
         fun sanitizeHostedUploadError(message: String): String {
             val t = message.trim().replace("\n", " ").take(400)

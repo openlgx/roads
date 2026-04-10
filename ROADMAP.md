@@ -129,6 +129,10 @@ Exit criteria:
 - outputs are viewable, exportable, and repeatable
 - raw data remains untouched by reprocessing
 
+Planned improvements (not implemented yet):
+- **Deferred on-device processing:** run windowing / anomaly work under **WorkManager**-style constraints (e.g. **charging**, **unmetered network / Wi‑Fi**, optional time windows) so heavy CPU use lands when the handset is idle, mirroring how upload policy already uses constraints — today processing is scheduled on app coroutines shortly after a completed trip (if live-after-session is on) or via **backfill**, with no charge/Wi‑Fi gate.
+- **Remote processing parameters:** optional **signed, versioned** calibration or heuristic-parameter bundle from the backend (tied to `SessionProcessingMethodVersions` semantics), fetched when network policy allows and applied on the next deferred run — needs reproducibility, rollback, integrity, and privacy review; **today** smoothing/heuristic behaviour is **local-only** (no closed loop where uploaded data drives per-device coefficients automatically).
+
 ---
 
 ## Phase 4 - Validation and labelling

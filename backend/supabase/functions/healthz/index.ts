@@ -8,14 +8,15 @@ Deno.serve(async (req) => {
   }
 
   let dbOk = false;
-  const sql = createSql();
+  let sql: ReturnType<typeof createSql> | undefined;
   try {
+    sql = createSql();
     await sql`SELECT 1`;
     dbOk = true;
   } catch {
     dbOk = false;
   } finally {
-    await sql.end({ timeout: 3 }).catch(() => {});
+    await sql?.end({ timeout: 3 }).catch(() => {});
   }
 
   return jsonResponse({
