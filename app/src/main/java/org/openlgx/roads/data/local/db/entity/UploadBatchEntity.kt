@@ -36,4 +36,8 @@ data class UploadBatchEntity(
     val roadFilterSummaryJson: String? = null,
     /** Redundant copy of [RecordingSessionEntity.uuid] for traceability in queue rows. */
     val sourceSessionUuid: String? = null,
+    /** True when filtered artifact differs from full export (fewer rows / trim). */
+    val filterChangedPayload: Boolean = false,
+    /** Populated when upload was not attempted ([BatchUploadState.SKIPPED]). */
+    val uploadSkipReason: String? = null,
 )

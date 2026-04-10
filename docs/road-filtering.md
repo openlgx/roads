@@ -23,7 +23,9 @@ The hosted alpha pipeline supports **optional** upload-time filtering so bundles
 
 ## Classification
 
-Along the GNSS path the evaluator samples at roughly **~25 m** or **~5 s** intervals (whichever is stricter in configuration), measures distance to the nearest road polyline, and maps to `RoadEligibilityDisposition`:
+Cadence and off-road suppression thresholds live in **`RoadFilterEngineConfig`** (`distanceCadenceMeters`, `timeCadenceMs`, `offRoadDistanceMultiplier`, `minOffRoadRunMeters`, `minOffRoadRunMs`, low-value skip bounds). Buffer width for ON/NEAR bands comes from **`AppSettings.uploadRoadFilterDistanceMeters`**.
+
+Along the GNSS path the evaluator samples at the configured cadence, measures distance to the nearest road polyline (grid-accelerated `LocalRoadIndex`), and maps to `RoadEligibilityDisposition`:
 
 - **LIKELY_PUBLIC_ROAD** — on or aligned with pack geometry
 - **NEAR_PUBLIC_ROAD** — close but not fully aligned (proximity band)
@@ -47,8 +49,9 @@ Diagnostics and Settings should show **active pack version**, **council slug**, 
 
 ## Filtered bundle contents
 
-- Wraps or reuses `SessionExporter` output; adds **`roadFilterSummaryJson`** (and/or manifest fields) describing classification summary.
-- `FilteredSessionExporter` in the app builds the artifact used by `SessionUploadWorker` when filtering is enabled.
+- **Same** `session.json` / canonical CSV+JSON names / `exportSchemaVersion` as full export; **additive** `manifest.json` keys (`roadFilterApplied`, `filterMethodVersion`, `roadPackVersion`) and **`road_filter_summary.json`** (counts, durations, suppression histogram, pack version).
+- **Low-value sessions:** auto-upload is **skipped** (`upload_batches.batchUploadState = SKIPPED`, `uploadSkipReason`); Room raw data unchanged.
+- `FilteredSessionExporter` builds the artifact used by `SessionUploadWorker`; a **full** export zip is still produced for `localRawArtifactUri` when a filtered upload is attempted.
 
 ---
 

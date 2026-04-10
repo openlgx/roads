@@ -63,6 +63,10 @@ constructor(
         val uploadProjectId = stringPreferencesKey("upload_project_id")
         val uploadDeviceId = stringPreferencesKey("upload_device_id")
         val uploadChargingPreferred = booleanPreferencesKey("upload_charging_preferred")
+        val hostedUploadLastAttemptMs = longPreferencesKey("hosted_upload_last_attempt_ms")
+        val hostedUploadLastSuccessMs = longPreferencesKey("hosted_upload_last_success_ms")
+        val hostedUploadLastError = stringPreferencesKey("hosted_upload_last_error")
+        val latestHostedUploadAttemptSessionId = longPreferencesKey("hosted_upload_last_session_id")
     }
 
     override val settings: Flow<AppSettings> =
@@ -137,7 +141,11 @@ constructor(
                 uploadProjectSlug = prefs[Keys.uploadProjectSlug] ?: "",
                 uploadProjectId = prefs[Keys.uploadProjectId] ?: "",
                 uploadDeviceId = prefs[Keys.uploadDeviceId] ?: "",
-                uploadChargingPreferred = prefs[Keys.uploadChargingPreferred] ?: false,
+                uploadChargingPreferred = prefs[Keys.uploadChargingPreferred] ?: true,
+                hostedUploadLastAttemptAtEpochMs = prefs[Keys.hostedUploadLastAttemptMs],
+                hostedUploadLastSuccessAtEpochMs = prefs[Keys.hostedUploadLastSuccessMs],
+                hostedUploadLastError = prefs[Keys.hostedUploadLastError],
+                latestHostedUploadAttemptLocalSessionId = prefs[Keys.latestHostedUploadAttemptSessionId],
             )
         }
 
@@ -360,6 +368,35 @@ constructor(
         dataStore.edit { it[Keys.uploadChargingPreferred] = preferred }
     }
 
+    override suspend fun markHostedUploadAttempt(sessionId: Long, timestampMs: Long) {
+        require(sessionId > 0L && timestampMs > 0L)
+        dataStore.edit {
+            it[Keys.hostedUploadLastAttemptMs] = timestampMs
+            it[Keys.latestHostedUploadAttemptSessionId] = sessionId
+            it.remove(Keys.hostedUploadLastError)
+        }
+    }
+
+    override suspend fun markHostedUploadSuccess(sessionId: Long, timestampMs: Long) {
+        require(sessionId > 0L && timestampMs > 0L)
+        dataStore.edit {
+            it[Keys.hostedUploadLastSuccessMs] = timestampMs
+            it[Keys.hostedUploadLastAttemptMs] = timestampMs
+            it[Keys.latestHostedUploadAttemptSessionId] = sessionId
+            it.remove(Keys.hostedUploadLastError)
+        }
+    }
+
+    override suspend fun markHostedUploadFailure(sessionId: Long, message: String, timestampMs: Long) {
+        require(sessionId > 0L && timestampMs > 0L)
+        val safe = sanitizeHostedUploadError(message)
+        dataStore.edit {
+            it[Keys.hostedUploadLastAttemptMs] = timestampMs
+            it[Keys.latestHostedUploadAttemptSessionId] = sessionId
+            it[Keys.hostedUploadLastError] = safe
+        }
+    }
+
     private companion object {
         const val DEFAULT_CAPTURE_START_SPEED_MPS = 2.8f
         const val DEFAULT_CAPTURE_IMMEDIATE_START_SPEED_MPS = 4.5f
@@ -372,5 +409,12 @@ constructor(
         const val DEFAULT_PROCESSING_LIVE_AFTER_SESSION = true
         const val DEFAULT_PROCESSING_ALL_RUNS_OVERLAY = true
         const val DEFAULT_UPLOAD_ROAD_FILTER_DISTANCE_M = 40f
+
+        fun sanitizeHostedUploadError(message: String): String {
+            val t = message.trim().replace("\n", " ").take(400)
+            if (t.contains("Bearer ", ignoreCase = true)) return "Upload failed (redacted)"
+            if (t.contains("apikey", ignoreCase = true) && t.length > 80) return "Upload failed (redacted)"
+            return t.ifEmpty { "Upload failed" }
+        }
     }
 }

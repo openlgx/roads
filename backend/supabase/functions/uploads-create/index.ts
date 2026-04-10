@@ -220,13 +220,19 @@ Deno.serve(async (req) => {
     return jsonResponse({
       uploadJobId,
       recordingSessionId,
+      artifactKind: body.artifactKind,
+      bucket,
       storageBucket: bucket,
       objectKey,
       signedUploadUrl: signData.signedUrl,
       signedUploadMethod: "PUT",
       signedUploadHeaders,
       signedUrlExpiresAt,
+      expiresAt: signedUrlExpiresAt,
       maxBytes: body.byteSize,
+      multipart: false,
+      checksumAlgorithm: "sha256",
+      requiredHeaders: signedUploadHeaders,
     });
   } catch (e) {
     console.error(e);

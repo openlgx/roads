@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import org.openlgx.roads.data.local.db.RoadsDatabase
 import org.openlgx.roads.data.local.db.model.SessionProcessingState
 import org.openlgx.roads.data.local.settings.AppSettingsRepository
+import org.openlgx.roads.debug.AgentDebugLog
 import org.openlgx.roads.di.ApplicationScope
 import timber.log.Timber
 
@@ -51,6 +52,18 @@ constructor(
             val ids =
                 runCatching { database.recordingSessionDao().listCompletedSessionIdsPendingProcessing() }
                     .getOrElse { emptyList() }
+            // #region agent log
+            AgentDebugLog.emit(
+                hypothesisId = "H_BACKFILL",
+                location = "SessionProcessingSchedulerImpl.kt:requestBackfillPendingProcessing",
+                message = "backfill_ids_loaded",
+                data =
+                    mapOf(
+                        "count" to ids.size,
+                        "firstFew" to ids.take(5).joinToString(","),
+                    ),
+            )
+            // #endregion
             if (ids.isEmpty()) return@launch
             Timber.i("Backfilling on-device processing for ${ids.size} session(s)")
             for (id in ids) {

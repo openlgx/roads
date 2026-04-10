@@ -28,6 +28,7 @@ fun SessionDetailScreen(
     onOpenReview: () -> Unit,
 ) {
     val detail by viewModel.detail.collectAsStateWithLifecycle()
+    val hostedDisplay by viewModel.hostedPipelineDisplay.collectAsStateWithLifecycle()
     val exportMessage by viewModel.exportMessage.collectAsStateWithLifecycle()
     val reprocessMessage by viewModel.reprocessMessage.collectAsStateWithLifecycle()
 
@@ -84,7 +85,22 @@ fun SessionDetailScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
             Text("Hosted pipeline (upload / remote)", style = MaterialTheme.typography.titleMedium)
-            Text("hostedPipelineState: ${s.hostedPipelineState}")
+            Text(
+                "Operator state: ${hostedDisplay ?: "—"} (see docs/pilot-readiness.md)",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "Stored state: ${s.hostedPipelineState}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            d.latestUploadBatch?.let { b ->
+                Text(
+                    "Last upload batch: ${b.batchUploadState} · attempts ${b.attemptCount}" +
+                        (b.remoteUploadJobId?.let { " · job $it" } ?: "") +
+                        (b.uploadSkipReason?.let { " · skip: $it" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Text("roughnessProxyScore: ${s.roughnessProxyScore ?: "—"} (${s.roughnessMethodVersion ?: "—"})")
             Text("roadResponseScore: ${s.roadResponseScore ?: "—"} (${s.roadResponseMethodVersion ?: "—"})")
 

@@ -24,10 +24,11 @@ For operator setup (secrets, rotation, CLI), see [setup-hosted-alpha.md](setup-h
 | SQL migrations | `backend/sql/migrations/` | Extensions, councils/projects/devices, sessions, jobs, artifacts, published runs, optional hosted derived tables |
 | Edge Functions | `backend/supabase/functions/` | `uploads-create`, `uploads-complete`, `healthz`, `council-layers-*` |
 | Shared TS | `backend/supabase/functions/_shared/` | CORS, JSON, errors, env, Neon (`postgres`), auth (hashed API keys), storage path builders |
-| Publish | `backend/publish/` | `publish_council_layers.py` — fail-closed without LGA boundary |
-| Processing | `backend/processing/` | `run_processing_job.py` — scaffold: download, validate, state machine |
-| Road pack | `backend/roadpack-build/` | `build_road_pack.py` — clip, version, checksum, Storage upload, `road_packs` row |
+| Publish | `backend/publish/` | `publish_council_layers.py` — reads `derived_window_features_hosted` / `anomaly_candidates_hosted`, LGA clip, consensus density gate; fail-closed without boundary |
+| Processing | `backend/processing/` | `run_processing_job.py` — download ZIP (`COALESCE(filtered_artifact_id, raw_artifact_id)`), roughness_lab windows + anomalies → `*_hosted`; **DELETE `*_hosted` rows only after job commits to `RUNNING`**, then rebuild |
+| Road pack | `backend/roadpack-build/` | `build_road_pack.py` — clip, version, checksum, Storage `public-roads.geojson`, `road_packs` row |
 | CI | `.github/workflows/` | Migration check, 12h publish, processing backfill, optional Supabase deploy |
+| Pilot scripts | `backend/scripts/` | `pilot_preflight.py`, `pilot_smoke_e2e.py`, `seed_pilot_council.py` — see [pilot-readiness.md](pilot-readiness.md) |
 
 **Rule:** Postgres stores pointers (storage keys), checksums, sizes, state enums—not megabyte-scale sensor dumps as row bodies.
 
@@ -39,7 +40,7 @@ Path builders are shared conceptually with Python (`backend/publish/libs/paths.p
 
 - `raw/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip`
 - `filtered/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip`
-- `roadpacks/{councilSlug}/{version}/public-roads.fgb`
+- `roadpacks/{councilSlug}/{version}/public-roads.geojson` (device/sideload parity; `.fgb` optional later)
 - `published/{councilSlug}/roughness/latest.geojson` (and `anomalies`, `consensus`)
 - `published/{councilSlug}/manifest.json`
 
@@ -57,7 +58,7 @@ Path builders are shared conceptually with Python (`backend/publish/libs/paths.p
 
 1. **POST** `uploads-create` — validate body, upsert `recording_sessions`, insert `upload_jobs`, return **signed PUT** for bucket + object key.
 2. **PUT** ZIP to Storage using returned URL and headers.
-3. **POST** `uploads-complete` — verify size/checksum, finalize job, insert `artifact`, enqueue `processing_jobs` (idempotent).
+3. **POST** `uploads-complete` — verify size/checksum against the `upload_jobs` row, **confirm the Storage object exists and its byte length matches** (ranged GET), finalize job, insert `artifact`, enqueue `processing_jobs` (idempotent). Returns **412** if the object is missing or size mismatches.
 
 See [api-contract.md](api-contract.md) for normative JSON.
 

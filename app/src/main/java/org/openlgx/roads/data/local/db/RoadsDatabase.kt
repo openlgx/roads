@@ -34,7 +34,7 @@ import org.openlgx.roads.data.local.db.entity.UploadBatchEntity
         SegmentConsensusRecordEntity::class,
         CalibrationRunEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

@@ -148,6 +148,13 @@ class SessionExporterRoomTest {
         override suspend fun setUploadDeviceId(id: String) = Unit
 
         override suspend fun setUploadChargingPreferred(preferred: Boolean) = Unit
+
+        override suspend fun markHostedUploadAttempt(sessionId: Long, timestampMs: Long) = Unit
+
+        override suspend fun markHostedUploadSuccess(sessionId: Long, timestampMs: Long) = Unit
+
+        override suspend fun markHostedUploadFailure(sessionId: Long, message: String, timestampMs: Long) =
+            Unit
     }
 
     private fun defaultSettings(calibrationWorkflow: Boolean = false): AppSettings =

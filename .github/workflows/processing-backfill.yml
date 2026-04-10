@@ -20,6 +20,7 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           SUPABASE_RAW_BUCKET: ${{ secrets.SUPABASE_RAW_BUCKET }}
           PROCESSING_MAX_JOBS: "5"
+          PYTHONPATH: ${{ github.workspace }}
         working-directory: backend/processing
         run: |
           if [ -z "$DATABASE_URL" ] || [ -z "$SUPABASE_SECRET_KEY" ]; then

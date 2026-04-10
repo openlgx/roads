@@ -19,6 +19,9 @@ data class UploadCreateResponse(
     val signedUploadHeaders: Map<String, String>,
     val signedUrlExpiresAt: String,
     val maxBytes: Long,
+    val artifactKind: String? = null,
+    val checksumAlgorithm: String? = null,
+    val multipart: Boolean = false,
 )
 
 data class UploadCompleteResponse(
@@ -88,16 +91,32 @@ class HostedUploadApi(
                     headers[k] = headersObj.getString(k)
                 }
             }
+            val storageBucketStr =
+                when {
+                    o.has("storageBucket") -> o.getString("storageBucket")
+                    o.has("bucket") -> o.getString("bucket")
+                    else -> ""
+                }.ifEmpty { o.getString("storageBucket") }
+            val expires =
+                when {
+                    o.has("signedUrlExpiresAt") -> o.getString("signedUrlExpiresAt")
+                    o.has("expiresAt") -> o.getString("expiresAt")
+                    else -> o.getString("signedUrlExpiresAt")
+                }
             return UploadCreateResponse(
                 uploadJobId = o.getString("uploadJobId"),
                 recordingSessionId = o.getString("recordingSessionId"),
-                storageBucket = o.getString("storageBucket"),
+                storageBucket = storageBucketStr,
                 objectKey = o.getString("objectKey"),
                 signedUploadUrl = o.getString("signedUploadUrl"),
                 signedUploadMethod = o.optString("signedUploadMethod", "PUT"),
                 signedUploadHeaders = headers,
-                signedUrlExpiresAt = o.getString("signedUrlExpiresAt"),
+                signedUrlExpiresAt = expires,
                 maxBytes = o.getLong("maxBytes"),
+                artifactKind = if (o.has("artifactKind")) o.getString("artifactKind") else null,
+                checksumAlgorithm =
+                    if (o.has("checksumAlgorithm")) o.getString("checksumAlgorithm") else null,
+                multipart = o.optBoolean("multipart", false),
             )
         }
     }
@@ -107,6 +126,8 @@ class HostedUploadApi(
         objectKey: String,
         byteSize: Long,
         contentChecksumSha256: String,
+        clientSessionUuid: String? = null,
+        artifactKind: String? = null,
     ): UploadCompleteResponse {
         val body = JSONObject().apply {
             put("apiVersion", 1)
@@ -114,6 +135,8 @@ class HostedUploadApi(
             put("objectKey", objectKey)
             put("byteSize", byteSize)
             put("contentChecksumSha256", contentChecksumSha256.lowercase())
+            if (clientSessionUuid != null) put("clientSessionUuid", clientSessionUuid)
+            if (artifactKind != null) put("artifactKind", artifactKind)
         }.toString()
         val req = Request.Builder()
             .url(url("uploads-complete"))

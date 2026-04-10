@@ -32,6 +32,7 @@ import org.openlgx.roads.permission.FineLocationPermissionChecker
 import org.openlgx.roads.processing.calibration.SessionCalibrationHook
 import org.openlgx.roads.processing.ondevice.SessionProcessingScheduler
 import org.openlgx.roads.upload.SessionUploadScheduling
+import org.openlgx.roads.debug.AgentDebugLog
 import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.service.CollectorForegroundPresentation
 import org.openlgx.roads.service.CollectorForegroundPresentationRegistry
@@ -438,11 +439,40 @@ constructor(
                 uploadPolicyPauseOnLowBattery = settings.uploadPauseOnLowBatteryEnabled,
                 uploadPolicyLowBatteryThresholdPercent = settings.uploadLowBatteryThresholdPercent,
             )
+        // #region agent log
+        AgentDebugLog.emit(
+            hypothesisId = "H_REC",
+            location = "PassiveCollectionCoordinator.kt:enterRecordingFromArming",
+            message = "before_beginAutoRecordingSession",
+            data =
+                mapOf(
+                    "armedAt" to armedAt,
+                    "now" to now,
+                    "passiveEffective" to settings.passiveCollectionEffective,
+                ),
+        )
+        // #endregion
         val id = recordingSessionRepository.beginAutoRecordingSession(params)
+        // #region agent log
+        AgentDebugLog.emit(
+            hypothesisId = "H_REC",
+            location = "PassiveCollectionCoordinator.kt:enterRecordingFromArming",
+            message = "after_beginAutoRecordingSession",
+            data = mapOf("sessionId" to id),
+        )
+        // #endregion
         activeSessionId = id
         lifecycleState = CollectorLifecycleState.RECORDING
         lowMovementSinceEpochMs = null
         armingStartedAtEpochMs = null
+        // #region agent log
+        AgentDebugLog.emit(
+            hypothesisId = "H_FGS",
+            location = "PassiveCollectionCoordinator.kt:enterRecordingFromArming",
+            message = "before_startCollectorService",
+            data = mapOf("sessionId" to id),
+        )
+        // #endregion
         foregroundServiceController.startCollectorService(id)
         recordingEventNotifier.notifyRecordingStarted(id)
         appSettingsRepository.recordRecordingStartedAt(now)

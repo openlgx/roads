@@ -87,4 +87,15 @@ interface AppSettingsRepository {
     suspend fun setUploadDeviceId(id: String)
 
     suspend fun setUploadChargingPreferred(preferred: Boolean)
+
+    /** Records telemetry for Settings / diagnostics (never log secrets). */
+    suspend fun markHostedUploadAttempt(sessionId: Long, timestampMs: Long = System.currentTimeMillis())
+
+    suspend fun markHostedUploadSuccess(sessionId: Long, timestampMs: Long = System.currentTimeMillis())
+
+    suspend fun markHostedUploadFailure(
+        sessionId: Long,
+        message: String,
+        timestampMs: Long = System.currentTimeMillis(),
+    )
 }

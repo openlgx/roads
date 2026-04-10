@@ -3,14 +3,20 @@ package org.openlgx.roads.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.net.URI
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.openlgx.roads.data.local.db.RoadsDatabase
 import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.data.local.settings.CaptureSettingsPreset
 import org.openlgx.roads.data.local.settings.UploadRoadFilterUnknownPolicy
+import org.openlgx.roads.roadpack.RoadPackManager
 import javax.inject.Inject
 
 @HiltViewModel
@@ -18,6 +24,8 @@ class SettingsViewModel
 @Inject
 constructor(
     private val appSettingsRepository: AppSettingsRepository,
+    private val roadsDatabase: RoadsDatabase,
+    private val roadPackManager: RoadPackManager,
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> =
@@ -64,9 +72,79 @@ constructor(
                     uploadProjectSlug = "",
                     uploadProjectId = "",
                     uploadDeviceId = "",
-                    uploadChargingPreferred = false,
+                    uploadChargingPreferred = true,
+                    hostedUploadLastAttemptAtEpochMs = null,
+                    hostedUploadLastSuccessAtEpochMs = null,
+                    hostedUploadLastError = null,
+                    latestHostedUploadAttemptLocalSessionId = null,
                 ),
         )
+
+    private val _hostedDiagnostics =
+        MutableStateFlow(
+            HostedUploadDiagnosticsUi(
+                uploadEnabled = false,
+                uploadBaseUrlHost = "",
+                uploadApiKeyConfigured = false,
+                uploadCouncilSlug = "",
+                uploadProjectSlug = "",
+                projectIdConfigured = false,
+                deviceIdConfigured = false,
+                roadPackPresent = false,
+                roadPackVersionLabel = null,
+                roadPackFeatureCount = 0,
+                roadPackLoadNote = null,
+                uploadQueuePendingOrRetryable = 0L,
+                uploadLastAttemptAtEpochMs = null,
+                uploadLastSuccessAtEpochMs = null,
+                uploadLastError = null,
+                wifiOnly = true,
+                cellularAllowed = false,
+                chargingRequiredHard = false,
+                chargingPreferredSoft = true,
+                uploadRetryLimit = 3,
+                uploadAutoAfterSession = false,
+                roadFilterEnabled = false,
+                roadPackRequiredForAutoUpload = true,
+            ),
+        )
+    val hostedDiagnostics: StateFlow<HostedUploadDiagnosticsUi> = _hostedDiagnostics.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            appSettingsRepository.settings.collectLatest { s ->
+                roadPackManager.invalidateCache()
+                val diag = roadPackManager.getDiagnostics(s.uploadCouncilSlug)
+                val pending = roadsDatabase.uploadBatchDao().countPendingOrRetryable()
+                _hostedDiagnostics.value =
+                    HostedUploadDiagnosticsUi(
+                        uploadEnabled = s.uploadEnabled,
+                        uploadBaseUrlHost = uploadBaseUrlSummary(s.uploadBaseUrl),
+                        uploadApiKeyConfigured = s.uploadApiKey.isNotBlank(),
+                        uploadCouncilSlug = s.uploadCouncilSlug,
+                        uploadProjectSlug = s.uploadProjectSlug,
+                        projectIdConfigured = s.uploadProjectId.isNotBlank(),
+                        deviceIdConfigured = s.uploadDeviceId.isNotBlank(),
+                        roadPackPresent = roadPackManager.hasPackForCouncil(s.uploadCouncilSlug),
+                        roadPackVersionLabel = diag.packVersion,
+                        roadPackFeatureCount = diag.featureCount,
+                        roadPackLoadNote = diag.loadError,
+                        uploadQueuePendingOrRetryable = pending,
+                        uploadLastAttemptAtEpochMs = s.hostedUploadLastAttemptAtEpochMs,
+                        uploadLastSuccessAtEpochMs = s.hostedUploadLastSuccessAtEpochMs,
+                        uploadLastError = s.hostedUploadLastError,
+                        wifiOnly = s.uploadWifiOnly,
+                        cellularAllowed = s.uploadAllowCellular,
+                        chargingRequiredHard = s.uploadOnlyWhileCharging,
+                        chargingPreferredSoft = s.uploadChargingPreferred,
+                        uploadRetryLimit = s.uploadRetryLimit,
+                        uploadAutoAfterSession = s.uploadAutoAfterSessionEnabled,
+                        roadFilterEnabled = s.uploadRoadFilterEnabled,
+                        roadPackRequiredForAutoUpload = s.uploadRoadPackRequiredForAutoUpload,
+                    )
+            }
+        }
+    }
 
     fun completeOnboarding() {
         viewModelScope.launch { appSettingsRepository.completeOnboarding() }
@@ -166,5 +244,32 @@ constructor(
 
     fun setUploadRoadFilterEnabled(enabled: Boolean) {
         viewModelScope.launch { appSettingsRepository.setUploadRoadFilterEnabled(enabled) }
+    }
+
+    /**
+     * Recommended pilot upload posture (does not enable upload or set secrets — configure URL/API key
+     * and Neon ids separately).
+     */
+    fun applyPilotUploadDefaults() {
+        viewModelScope.launch {
+            appSettingsRepository.setUploadWifiOnly(true)
+            appSettingsRepository.setUploadAllowCellular(false)
+            appSettingsRepository.setUploadChargingPreferred(true)
+            appSettingsRepository.setUploadRetryLimit(3)
+            appSettingsRepository.setUploadAutoAfterSessionEnabled(true)
+            appSettingsRepository.setUploadRoadFilterEnabled(true)
+            appSettingsRepository.setUploadRoadPackRequiredForAutoUpload(true)
+        }
+    }
+
+    private companion object {
+        fun uploadBaseUrlSummary(url: String): String {
+            if (url.isBlank()) return "(not set)"
+            return try {
+                URI(url).host ?: url.take(64)
+            } catch (_: Exception) {
+                url.take(64)
+            }
+        }
     }
 }

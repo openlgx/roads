@@ -11,7 +11,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.openlgx.roads.data.local.db.RoadsDatabase
+import org.openlgx.roads.data.local.db.model.SessionHostedPipelineState
 import org.openlgx.roads.data.local.settings.AppSettings
+import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.roadpack.RoadPackManager
 
 @Singleton
@@ -20,13 +23,25 @@ class SessionUploadWorkScheduler
 constructor(
     @ApplicationContext private val context: Context,
     private val roadPackManager: RoadPackManager,
+    private val roadsDatabase: RoadsDatabase,
+    private val appSettingsRepository: AppSettingsRepository,
 ) : SessionUploadScheduling {
 
-    override fun scheduleAfterSessionCompleted(sessionId: Long, settings: AppSettings) {
+    override suspend fun scheduleAfterSessionCompleted(sessionId: Long, settings: AppSettings) {
         if (!settings.uploadEnabled || !settings.uploadAutoAfterSessionEnabled) return
         if (settings.uploadRoadPackRequiredForAutoUpload &&
             !roadPackManager.hasPackForCouncil(settings.uploadCouncilSlug)
         ) {
+            val slug = settings.uploadCouncilSlug.trim().ifEmpty { "(not set)" }
+            roadsDatabase.recordingSessionDao().updateHostedPipelineState(
+                sessionId,
+                SessionHostedPipelineState.FAILED,
+            )
+            appSettingsRepository.markHostedUploadFailure(
+                sessionId,
+                "Road pack required for auto-upload but none installed for council slug \"$slug\". " +
+                    "Sideload pack to files/road_packs/<slug>/<version>/public-roads.geojson.",
+            )
             return
         }
 

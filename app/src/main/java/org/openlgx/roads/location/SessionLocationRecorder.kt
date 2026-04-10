@@ -19,6 +19,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.openlgx.roads.data.local.db.RoadsDatabase
 import org.openlgx.roads.data.local.db.entity.LocationSampleEntity
+import org.openlgx.roads.debug.AgentDebugLog
 import org.openlgx.roads.di.ApplicationScope
 import timber.log.Timber
 
@@ -81,11 +82,30 @@ constructor(
                     .build()
 
             val cb =
-                gateway.requestLocationUpdates(request, mainLooper) { location ->
-                    scope.launch {
-                        onLocationUpdate(location, sessionId)
+                // #region agent log
+                runCatching {
+                    gateway.requestLocationUpdates(request, mainLooper) { location ->
+                        scope.launch {
+                            onLocationUpdate(location, sessionId)
+                        }
                     }
                 }
+                    .onFailure { e ->
+                        AgentDebugLog.emit(
+                            hypothesisId = "H_LOC",
+                            location = "SessionLocationRecorder.kt:startRecording",
+                            message = "requestLocationUpdates_failed",
+                            data =
+                                mapOf(
+                                    "ex" to e.javaClass.simpleName,
+                                    "msg" to (e.message ?: ""),
+                                    "sessionId" to sessionId,
+                                ),
+                        )
+                        throw e
+                    }
+                    .getOrThrow()
+            // #endregion
 
             synchronized(bufferLock) { locationCallback = cb }
 

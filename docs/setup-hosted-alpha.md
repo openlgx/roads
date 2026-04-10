@@ -24,14 +24,14 @@ This guide is for **operators and contributors** wiring the ingestion/publish st
 | `backend/supabase/` | `config.toml`, `functions/*` |
 | `backend/supabase/functions/_shared/` | TS helpers (CORS, JSON, Neon pool, auth, paths) |
 | `backend/publish/` | `publish_council_layers.py` |
-| `backend/processing/` | `run_processing_job.py` scaffold |
+| `backend/processing/` | `run_processing_job.py` (+ `libs/hosted_analysis.py`, `PYTHONPATH` = repo root in CI) |
 | `backend/roadpack-build/` | `build_road_pack.py` |
 
 ---
 
 ## Environment variables
 
-See **`backend/.env.example`**. Typical names:
+See **`backend/.env.example`** (repo template; copy to gitignored `backend/.env.local`). Typical names:
 
 | Variable | Used by |
 |----------|---------|
@@ -154,15 +154,20 @@ Configure function secrets in Supabase dashboard: `DATABASE_URL_POOLED`, `SUPABA
 1. Run SQL migrations on Neon branch.
 2. Create buckets and Edge secrets.
 3. Deploy functions; smoke `healthz`.
-4. Seed **council**, **project**, **device**, **lga_boundaries** (real boundary required before publish).
-5. Issue **DEVICE_UPLOAD** key to the app; **COUNCIL_READ** for GIS consumers.
-6. Build and register **road pack** (`roadpack-build`) before expecting road-filtered uploads.
-7. Field-test signed PUT size/latency on target devices.
+4. Seed **council**, **project**, **device**, **lga_boundaries** (real boundary required before publish). Automatable path: `python backend/scripts/seed_pilot_council.py` (see [pilot-readiness.md](pilot-readiness.md)).
+5. Run `python backend/scripts/pilot_preflight.py --council-slug <slug>`.
+6. Issue **DEVICE_UPLOAD** key to the app; **COUNCIL_READ** for GIS consumers.
+7. Build and register **road pack** (`roadpack-build`) before expecting road-filtered uploads.
+8. **Sideload on device:** copy `public-roads.geojson` into app-private storage  
+   `filesDir/road_packs/{councilSlug}/{version}/public-roads.geojson`  
+   (same path shape as the Storage key, under the app sandbox). Optional `pack.json` in that folder may include `"version"`. The app picks the **lexicographically last** version directory name when multiple exist.
+9. Field-test signed PUT size/latency on target devices.
 
 ---
 
 ## Related
 
+- [docs/pilot-readiness.md](pilot-readiness.md)
 - [docs/api-contract.md](api-contract.md)
 - [docs/council-publishing.md](council-publishing.md)
 - [docs/backend.md](backend.md)

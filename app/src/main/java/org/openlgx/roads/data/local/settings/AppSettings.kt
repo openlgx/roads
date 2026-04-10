@@ -69,4 +69,12 @@ data class AppSettings(
      * @see uploadOnlyWhileCharging for the hard requirement.
      */
     val uploadChargingPreferred: Boolean,
+    /** Epoch ms of last hosted upload attempt (any outcome). */
+    val hostedUploadLastAttemptAtEpochMs: Long? = null,
+    /** Epoch ms of last successful hosted upload completion. */
+    val hostedUploadLastSuccessAtEpochMs: Long? = null,
+    /** Sanitized error summary; never contains API keys. */
+    val hostedUploadLastError: String? = null,
+    /** Local session id associated with [hostedUploadLastError] / last attempt when known. */
+    val latestHostedUploadAttemptLocalSessionId: Long? = null,
 )

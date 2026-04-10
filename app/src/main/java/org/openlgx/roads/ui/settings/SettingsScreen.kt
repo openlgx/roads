@@ -28,6 +28,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val hostedDiag by viewModel.hostedDiagnostics.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -100,7 +101,67 @@ fun SettingsScreen(
 
             Text("Hosted alpha upload", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Additive cloud upload (Supabase Edge + Neon). Set base URL, API key, project + device UUIDs via repository/debug tooling; see docs/setup-hosted-alpha.md.",
+                "Additive cloud upload (Supabase Edge + Neon). Device builds only need upload base URL + DEVICE_UPLOAD key + project/device UUIDs (never Neon or Supabase service keys). See docs/pilot-readiness.md.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Button(onClick = { viewModel.applyPilotUploadDefaults() }) {
+                Text("Apply recommended pilot upload defaults")
+            }
+            Text("Hosted upload diagnostics (no secrets shown)", style = MaterialTheme.typography.titleSmall)
+            Text("Upload enabled: ${hostedDiag.uploadEnabled}", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Base URL host: ${hostedDiag.uploadBaseUrlHost}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "API key present: ${hostedDiag.uploadApiKeyConfigured}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Council slug: \"${hostedDiag.uploadCouncilSlug}\" · project slug: \"${hostedDiag.uploadProjectSlug}\"",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Project id set: ${hostedDiag.projectIdConfigured} · Device id set: ${hostedDiag.deviceIdConfigured}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Road pack: ${if (hostedDiag.roadPackPresent) "loaded" else "missing"} " +
+                    "(${hostedDiag.roadPackFeatureCount} features)" +
+                    (hostedDiag.roadPackVersionLabel?.let { " · version dir $it" } ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            hostedDiag.roadPackLoadNote?.let {
+                Text("Pack load note: $it", style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                "Upload queue (pending/retryable rows): ${hostedDiag.uploadQueuePendingOrRetryable}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Last upload attempt (epoch ms): ${hostedDiag.uploadLastAttemptAtEpochMs ?: "—"}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Last successful upload (epoch ms): ${hostedDiag.uploadLastSuccessAtEpochMs ?: "—"}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Last upload error: ${hostedDiag.uploadLastError ?: "—"}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Network: Wi‑Fi only ${hostedDiag.wifiOnly}, cellular allowed ${hostedDiag.cellularAllowed}; " +
+                    "charging hard gate ${hostedDiag.chargingRequiredHard}, soft preferred ${hostedDiag.chargingPreferredSoft}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Retry limit: ${hostedDiag.uploadRetryLimit} · auto after session: ${hostedDiag.uploadAutoAfterSession} · " +
+                    "road filter: ${hostedDiag.roadFilterEnabled} · pack required for auto: ${hostedDiag.roadPackRequiredForAutoUpload}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Road pack path on device: Android files dir → road_packs/<council_slug>/<version>/public-roads.geojson",
                 style = MaterialTheme.typography.bodySmall,
             )
             SettingToggleRow(
@@ -128,11 +189,6 @@ fun SettingsScreen(
                 checked = settings.uploadRoadFilterEnabled,
                 onCheckedChange = viewModel::setUploadRoadFilterEnabled,
             )
-            Text(
-                "Council slug: \"${settings.uploadCouncilSlug}\" — pack under files/road_packs/{slug}/",
-                style = MaterialTheme.typography.bodySmall,
-            )
-
             Text("Local storage safety (placeholders)", style = MaterialTheme.typography.titleMedium)
             Text("Retention days: ${settings.retentionDays}", style = MaterialTheme.typography.bodyMedium)
             Button(onClick = { viewModel.setRetentionDays(30) }) { Text("Retention: 30 days") }

@@ -4,6 +4,7 @@ import { errorResponse } from "../_shared/errors.ts";
 import { requireEnv } from "../_shared/env.ts";
 import { jsonResponse } from "../_shared/json.ts";
 import { createSql } from "../_shared/neon.ts";
+import { verifyStorageObjectSize } from "../_shared/storage_object.ts";
 
 type CompleteBody = {
   apiVersion: number;
@@ -11,6 +12,8 @@ type CompleteBody = {
   objectKey: string;
   byteSize: number;
   contentChecksumSha256: string;
+  clientSessionUuid?: string;
+  artifactKind?: string;
 };
 
 function isUuid(s: string): boolean {
@@ -53,6 +56,12 @@ Deno.serve(async (req) => {
     }
     if (!/^[a-f0-9]{64}$/i.test(body.contentChecksumSha256)) {
       return errorResponse("bad_request", "Invalid checksum", 400);
+    }
+    if (
+      body.clientSessionUuid !== undefined &&
+      !isUuid(body.clientSessionUuid)
+    ) {
+      return errorResponse("bad_request", "Invalid clientSessionUuid", 400);
     }
 
     const jobs = await sql<
@@ -103,6 +112,14 @@ Deno.serve(async (req) => {
       return errorResponse("conflict", "Metadata does not match upload job", 409);
     }
 
+    if (
+      body.artifactKind !== undefined &&
+      (job.artifact_kind ?? "").toUpperCase() !==
+        body.artifactKind.toUpperCase()
+    ) {
+      return errorResponse("conflict", "artifactKind does not match upload job", 409);
+    }
+
     const sess = await sql<
       {
         id: string;
@@ -115,12 +132,36 @@ Deno.serve(async (req) => {
     const s = sess[0];
     if (!s) return errorResponse("not_found", "recording session missing", 404);
 
+    if (body.clientSessionUuid !== undefined) {
+      const match = await sql<{ ok: boolean }[]>`
+        SELECT (client_session_uuid = ${body.clientSessionUuid}::uuid) AS ok
+        FROM recording_sessions WHERE id = ${s.id}::uuid LIMIT 1`;
+      if (!match[0]?.ok) {
+        return errorResponse("conflict", "clientSessionUuid does not match session", 409);
+      }
+    }
+
     if (keyRow.project_id && keyRow.project_id !== s.project_id) {
       return errorResponse("forbidden", "Key not scoped to this project", 403);
     }
 
     const bucket = requireEnv("SUPABASE_RAW_BUCKET");
     const kind = job.artifact_kind ?? "RAW_UPLOAD";
+
+    const supabaseUrl = requireEnv("SUPABASE_PROJECT_URL").replace(/\/$/, "");
+    const serviceKey = requireEnv("SUPABASE_SECRET_KEY");
+    try {
+      await verifyStorageObjectSize(
+        supabaseUrl,
+        serviceKey,
+        bucket,
+        body.objectKey,
+        body.byteSize,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "storage verify failed";
+      return errorResponse("precondition_failed", msg, 412);
+    }
 
     const artIns = await sql<{ id: string }[]>`
       INSERT INTO artifacts (

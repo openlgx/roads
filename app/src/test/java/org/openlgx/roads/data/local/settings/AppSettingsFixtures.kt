@@ -45,5 +45,9 @@ fun testAppSettings(
         uploadProjectSlug = "",
         uploadProjectId = "",
         uploadDeviceId = "",
-        uploadChargingPreferred = false,
+        uploadChargingPreferred = true,
+        hostedUploadLastAttemptAtEpochMs = null,
+        hostedUploadLastSuccessAtEpochMs = null,
+        hostedUploadLastError = null,
+        latestHostedUploadAttemptLocalSessionId = null,
     )

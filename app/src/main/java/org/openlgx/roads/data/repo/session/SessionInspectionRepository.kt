@@ -2,6 +2,7 @@ package org.openlgx.roads.data.repo.session
 
 import kotlinx.coroutines.flow.Flow
 import org.openlgx.roads.data.local.db.entity.RecordingSessionEntity
+import org.openlgx.roads.data.local.db.entity.UploadBatchEntity
 import org.openlgx.roads.data.local.db.model.SessionListStats
 import org.openlgx.roads.validation.SessionCaptureValidationSummary
 
@@ -14,6 +15,8 @@ data class SessionDetail(
     /** End time for duration: [RecordingSessionEntity.endedAtEpochMs] or now if still active. */
     val durationMs: Long,
     val validation: SessionCaptureValidationSummary,
+    /** Latest hosted upload batch row for this session, if any. */
+    val latestUploadBatch: UploadBatchEntity? = null,
 )
 
 interface SessionInspectionRepository {

@@ -41,6 +41,7 @@ import org.openlgx.roads.service.CollectorForegroundPresentationRegistry
 import org.openlgx.roads.service.CollectorForegroundServiceController
 import org.openlgx.roads.service.CollectorServiceStateRegistry
 import org.openlgx.roads.service.RecordingEventNotifier
+import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.upload.SessionUploadScheduling
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -84,7 +85,13 @@ class PassiveCollectionCoordinatorTest {
                     serviceStateRegistry = CollectorServiceStateRegistry(),
                     sessionCalibrationHook = NoOpSessionCalibrationHook,
                     sessionProcessingScheduler = NoOpSessionProcessingScheduler,
-                    sessionUploadScheduling = SessionUploadScheduling { _, _ -> },
+                    sessionUploadScheduling =
+                        object : SessionUploadScheduling {
+                            override suspend fun scheduleAfterSessionCompleted(
+                                sessionId: Long,
+                                settings: AppSettings,
+                            ) = Unit
+                        },
                     foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
                     recordingEventNotifier =
                         RecordingEventNotifier(ApplicationProvider.getApplicationContext()),
@@ -137,7 +144,13 @@ class PassiveCollectionCoordinatorTest {
                     serviceStateRegistry = CollectorServiceStateRegistry(),
                     sessionCalibrationHook = NoOpSessionCalibrationHook,
                     sessionProcessingScheduler = NoOpSessionProcessingScheduler,
-                    sessionUploadScheduling = SessionUploadScheduling { _, _ -> },
+                    sessionUploadScheduling =
+                        object : SessionUploadScheduling {
+                            override suspend fun scheduleAfterSessionCompleted(
+                                sessionId: Long,
+                                settings: AppSettings,
+                            ) = Unit
+                        },
                     foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
                     recordingEventNotifier =
                         RecordingEventNotifier(ApplicationProvider.getApplicationContext()),
@@ -208,7 +221,13 @@ class PassiveCollectionCoordinatorTest {
                     serviceStateRegistry = CollectorServiceStateRegistry(),
                     sessionCalibrationHook = NoOpSessionCalibrationHook,
                     sessionProcessingScheduler = scheduler,
-                    sessionUploadScheduling = SessionUploadScheduling { _, _ -> },
+                    sessionUploadScheduling =
+                        object : SessionUploadScheduling {
+                            override suspend fun scheduleAfterSessionCompleted(
+                                sessionId: Long,
+                                settings: AppSettings,
+                            ) = Unit
+                        },
                     foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
                     recordingEventNotifier =
                         RecordingEventNotifier(ApplicationProvider.getApplicationContext()),

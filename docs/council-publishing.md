@@ -35,7 +35,9 @@ Under **private** bucket `roads-alpha-published` (name configurable via env):
 - Optional `.fgb` siblings when the pipeline emits FlatGeobuf.
 - `published/{councilSlug}/manifest.json` — **versioned** manifest (see below).
 
-The Python entrypoint is `backend/publish/publish_council_layers.py`.
+The Python entrypoint is `backend/publish/publish_council_layers.py`. Hosted rows are joined with **`council_id` + `project_id`**, geometries are **Shapely-clipped** to the authoritative LGA polygon, and outputs are **sorted** for deterministic GeoJSON.
+
+**Consensus:** A council-wide line trace is emitted only when **at least 2** distinct `recording_session_id` values contribute **≥ 50** in-bound window points; otherwise an **empty** `consensus` FeatureCollection is still uploaded so Edge URLs remain stable. `manifest.consensusEmitted` records the outcome.
 
 ---
 
@@ -45,12 +47,15 @@ Every `manifest.json` MUST be valid JSON with at minimum:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `manifestVersion` | int | Bump when shape/semantics change; start at **1** |
+| `manifestVersion` | int | Bump when shape/semantics change; current publish writes **2** |
 | `councilSlug` | string | Owner scope |
 | `publishedAt` | string | ISO-8601 UTC |
 | `publishRunId` | uuid | Neon `published_layer_runs.id` |
-| `layerArtifacts` | object | Map layer name → `{ storageKey, byteSize?, checksum?, mimeType, schemaVersion? }` for roughness, anomalies, consensus (and optional `.fgb` entries) |
-| `sourceProcessingVersions` | object | Producer transparency, e.g. `{ "processor": "0.1.0", "exportSchemaVersion": 3 }` — descriptive, not an IRI or certification claim |
+| `layerArtifacts` | object | Map layer name → `{ storageKey, mimeType, schemaVersion, byteSize, omitted? }` plus optional notes |
+| `consensusEmitted` | bool | Whether multi-session density gate passed |
+| `sourceProcessingVersions` | object | Producer transparency — descriptive, not an IRI or certification claim |
+| `refreshCadenceNote` | string | Explains scheduled publish cadence for operators |
+| `disclaimer` | string | Non-IRI / experimental statement |
 
 The publish job writes the manifest **after** layer files succeed so consumers see a consistent snapshot.
 
@@ -60,13 +65,16 @@ Deterministic key ordering inside `layerArtifacts` is recommended but not requir
 
 ## Consuming in GIS
 
-- **QGIS / ArcGIS:** Import **GeoJSON** or **FlatGeobuf** from a signed download path exposed by Edge Functions (`council-layers-*`) using a **`COUNCIL_READ`** key.
-- Always verify **`manifestVersion`** and **`publishedAt`** before replacing local cached layers.
+- **QGIS / ArcGIS:** Import **GeoJSON** (primary for alpha) from Edge Function URLs (`council-layers-*`) using a **`COUNCIL_READ`** key. **FlatGeobuf** for published layers is **not** emitted in the current pilot slice.
+- Always verify **`manifestVersion`**, **`publishedAt`**, and **`publishRunId`** before replacing local cached layers.
+
+**Pilot URLs, key handling, and refresh expectations:** [pilot-readiness.md](pilot-readiness.md) (GIS validation section).
 
 ---
 
 ## Related
 
+- [docs/pilot-readiness.md](pilot-readiness.md) — single-council pilot operator pack
 - [docs/setup-hosted-alpha.md](setup-hosted-alpha.md) — operator setup, secrets
 - [docs/api-contract.md](api-contract.md) — Edge URLs and auth
 - [ROADMAP.md](../ROADMAP.md) — product phases

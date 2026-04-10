@@ -15,6 +15,11 @@ from pathlib import Path
 
 import psycopg
 
+from libs.clip_geojson import (
+    clip_line_to_boundary,
+    clip_point_to_boundary,
+    shapely_boundary_from_geojson,
+)
 from libs.paths import (
     published_anomalies_geojson_key,
     published_consensus_geojson_key,
@@ -22,6 +27,9 @@ from libs.paths import (
     published_roughness_geojson_key,
 )
 from libs.supabase_storage import storage_upload
+
+CONSENSUS_MIN_SESSIONS = 2
+CONSENSUS_MIN_POINTS = 50
 
 
 def load_env():
@@ -44,18 +52,27 @@ def dumped_sorted_json(obj) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
 
+def _payload_as_dict(payload) -> dict:
+    if isinstance(payload, dict):
+        return payload
+    if isinstance(payload, str):
+        return json.loads(payload)
+    return json.loads(json.dumps(payload))
+
+
 def publish_council(cur, conn, council_id: str, council_slug: str, publisher_version: str) -> None:
     published_bucket = os.environ.get("SUPABASE_PUBLISHED_BUCKET", "roads-alpha-published")
 
     cur.execute(
         """
-        SELECT id, geometry IS NOT NULL AS has_geom
-        FROM lga_boundaries WHERE council_id = %s::uuid
+        SELECT ST_AsGeoJSON(geometry)::text
+        FROM lga_boundaries WHERE council_id = %s::uuid AND geometry IS NOT NULL
         """,
         (council_id,),
     )
     row = cur.fetchone()
-    if not row or not row[1]:
+    geojson_txt = row[0] if row else None
+    if not geojson_txt:
         cur.execute(
             """
             INSERT INTO published_layer_runs (
@@ -77,6 +94,8 @@ def publish_council(cur, conn, council_id: str, council_slug: str, publisher_ver
         print(f"SKIP council {council_slug}: no boundary (fail-closed)")
         return
 
+    boundary = shapely_boundary_from_geojson(geojson_txt)
+
     cur.execute(
         "SELECT id FROM projects WHERE council_id = %s::uuid LIMIT 1", (council_id,)
     )
@@ -97,40 +116,135 @@ def publish_council(cur, conn, council_id: str, council_slug: str, publisher_ver
     )
     run_uuid = str(cur.fetchone()[0])
 
-    roughness_fc = {"type": "FeatureCollection", "features": []}
-    anomalies_fc = {"type": "FeatureCollection", "features": []}
-    consensus_fc = {"type": "FeatureCollection", "features": []}
+    cur.execute(
+        """
+        SELECT payload_json, recording_session_id::text
+        FROM derived_window_features_hosted
+        WHERE council_id = %s::uuid AND project_id = %s::uuid
+        ORDER BY recording_session_id,
+          COALESCE((payload_json->>'windowStartMs')::float, 0::float)
+        """,
+        (council_id, project_id),
+    )
+    derived_rows = cur.fetchall()
+
+    roughness_features: list[dict] = []
+    consensus_points: list[tuple[float, float, float, str]] = []
+    for i, (payload, rsid) in enumerate(derived_rows):
+        pl = _payload_as_dict(payload)
+        geom = pl.get("geometry") or {}
+        cg = clip_point_to_boundary(geom, boundary)
+        if not cg:
+            continue
+        props = {k: v for k, v in pl.items() if k != "geometry"}
+        props.pop("_sortSession", None)
+        props.pop("_sortT", None)
+        sort_t = float(props.get("windowStartMs") or 0)
+        roughness_features.append(
+            {"type": "Feature", "id": i, "geometry": cg, "properties": props}
+        )
+        c = cg.get("coordinates")
+        if isinstance(c, list) and len(c) >= 2:
+            consensus_points.append((float(c[0]), float(c[1]), sort_t, rsid))
+
+    cur.execute(
+        """
+        SELECT payload_json, recording_session_id::text
+        FROM anomaly_candidates_hosted
+        WHERE council_id = %s::uuid AND project_id = %s::uuid
+        ORDER BY recording_session_id,
+          COALESCE((payload_json->>'windowStartMs')::float, 0::float)
+        """,
+        (council_id, project_id),
+    )
+    ano_rows = cur.fetchall()
+    anomaly_features: list[dict] = []
+    for i, (payload, rsid) in enumerate(ano_rows):
+        pl = _payload_as_dict(payload)
+        geom = pl.get("geometry") or {}
+        cg = clip_point_to_boundary(geom, boundary)
+        if not cg:
+            continue
+        props = {k: v for k, v in pl.items() if k != "geometry"}
+        props["recordingSessionId"] = rsid
+        anomaly_features.append({"type": "Feature", "id": i, "geometry": cg, "properties": props})
+
+    distinct_sessions = {p[3] for p in consensus_points}
+    consensus_fc: dict = {"type": "FeatureCollection", "features": []}
+    consensus_emitted = False
+    if (
+        len(distinct_sessions) >= CONSENSUS_MIN_SESSIONS
+        and len(consensus_points) >= CONSENSUS_MIN_POINTS
+    ):
+        from shapely.geometry import LineString
+
+        consensus_points.sort(key=lambda x: (x[3], x[2], x[0], x[1]))
+        coords = [(p[0], p[1]) for p in consensus_points]
+        line = LineString(coords)
+        for seg_geom in clip_line_to_boundary(line, boundary):
+            consensus_fc["features"].append(
+                {
+                    "type": "Feature",
+                    "geometry": seg_geom,
+                    "properties": {
+                        "kind": "hosted_consensus_trace",
+                        "sourcePoints": len(consensus_points),
+                        "sessionsRepresented": len(distinct_sessions),
+                    },
+                }
+            )
+        consensus_emitted = len(consensus_fc["features"]) > 0
+
+    roughness_fc = {"type": "FeatureCollection", "features": roughness_features}
+    anomalies_fc = {"type": "FeatureCollection", "features": anomaly_features}
 
     rough_j = dumped_sorted_json(roughness_fc)
     ano_j = dumped_sorted_json(anomalies_fc)
     con_j = dumped_sorted_json(consensus_fc)
 
+    layer_artifacts: dict = {
+        "roughness": {
+            "storageKey": published_roughness_geojson_key(council_slug),
+            "mimeType": "application/geo+json",
+            "schemaVersion": 1,
+            "byteSize": len(rough_j.encode("utf-8")),
+        },
+        "anomalies": {
+            "storageKey": published_anomalies_geojson_key(council_slug),
+            "mimeType": "application/geo+json",
+            "schemaVersion": 1,
+            "byteSize": len(ano_j.encode("utf-8")),
+        },
+        "consensus": {
+            "storageKey": published_consensus_geojson_key(council_slug),
+            "mimeType": "application/geo+json",
+            "schemaVersion": 1,
+            "byteSize": len(con_j.encode("utf-8")),
+            "omitted": not consensus_emitted,
+            "note": (
+                "Multi-session density gate not met — empty FeatureCollection for stable URLs."
+                if not consensus_emitted
+                else "Council-level clipped trace."
+            ),
+        },
+    }
+
     manifest = {
-        "manifestVersion": 1,
+        "manifestVersion": 2,
         "councilSlug": council_slug,
         "publishedAt": datetime.now(timezone.utc).isoformat(),
         "publishRunId": run_uuid,
-        "layerArtifacts": {
-            "roughness": {
-                "storageKey": published_roughness_geojson_key(council_slug),
-                "mimeType": "application/geo+json",
-                "schemaVersion": 1,
-            },
-            "anomalies": {
-                "storageKey": published_anomalies_geojson_key(council_slug),
-                "mimeType": "application/geo+json",
-                "schemaVersion": 1,
-            },
-            "consensus": {
-                "storageKey": published_consensus_geojson_key(council_slug),
-                "mimeType": "application/geo+json",
-                "schemaVersion": 1,
-            },
-        },
+        "layerArtifacts": layer_artifacts,
         "sourceProcessingVersions": {
             "publisher": publisher_version,
-            "note": "Experimental alpha — not IRI; geometries clipped to LGA when features exist.",
+            "note": "Experimental alpha — not IRI; LGA-clipped only.",
         },
+        "consensusEmitted": consensus_emitted,
+        "disclaimer": "Experimental council-facing layers — not IRI or formal road condition.",
+        "refreshCadenceNote": (
+            "GIS clients should refresh on their schedule; automated publish may run roughly every 12h "
+            "— see docs/pilot-readiness.md."
+        ),
     }
     man_j = dumped_sorted_json(manifest)
 
@@ -194,7 +308,18 @@ def publish_council(cur, conn, council_id: str, council_slug: str, publisher_ver
         UPDATE published_layer_runs SET state = 'COMPLETED', completed_at = now(),
           summary_json = %s::jsonb WHERE id = %s::uuid
         """,
-        (json.dumps({"councilSlug": council_slug, "layerFiles": 4}), run_uuid),
+        (
+            json.dumps(
+                {
+                    "councilSlug": council_slug,
+                    "roughnessFeatures": len(roughness_features),
+                    "anomalyFeatures": len(anomaly_features),
+                    "consensusFeatureCount": len(consensus_fc["features"]),
+                    "consensusEmitted": consensus_emitted,
+                }
+            ),
+            run_uuid,
+        ),
     )
     print(f"Published council {council_slug} run {run_uuid}")
 

@@ -89,9 +89,15 @@ Optional (alpha may omit): `startedAtEpochMs` (ms since epoch; used for storage 
 | `signedUploadMethod` | string | `PUT` |
 | `signedUploadHeaders` | object | Headers client must send with PUT (e.g. `Content-Type`, `x-upsert`) |
 | `signedUrlExpiresAt` | string | ISO-8601 expiry |
+| `expiresAt` | string | Alias of `signedUrlExpiresAt` (same instant) |
 | `maxBytes` | int | Must match or cap requested `byteSize` |
+| `artifactKind` | string | Echo of request (`RAW_UPLOAD` / `FILTERED_UPLOAD`) |
+| `bucket` | string | Alias of `storageBucket` |
+| `multipart` | bool | `false` for single-part PUT |
+| `checksumAlgorithm` | string | `sha256` |
+| `requiredHeaders` | object | Echo of headers required on PUT |
 
-**Multipart scaffold (future):** Response may add `multipart: false`, `maxBytes`, and optional chunk fields; clients should ignore unknown keys.
+**Multipart scaffold (future):** Chunk fields may be added without bumping `apiVersion`; clients should ignore unknown keys.
 
 ---
 
@@ -106,6 +112,8 @@ Optional (alpha may omit): `startedAtEpochMs` (ms since epoch; used for storage 
 | `objectKey` | string | yes; must match create response |
 | `byteSize` | int | yes |
 | `contentChecksumSha256` | string | yes; sha256 hex |
+| `clientSessionUuid` | uuid | optional; must match session if present |
+| `artifactKind` | string | optional; must match upload job if present |
 
 ### Response `200`
 
@@ -118,6 +126,8 @@ Optional (alpha may omit): `startedAtEpochMs` (ms since epoch; used for storage 
 
 **Idempotency:** Repeating complete with the same checksum yields the same final state; duplicate artifacts are not created.
 
+**Storage verification:** Before inserting artifacts, the function performs a **ranged read** against Storage to confirm the object exists and its **total byte length** matches `byteSize`. On mismatch or missing object, the API returns **`412 Precondition Failed`** (`precondition_failed`) and leaves the upload job incomplete.
+
 ---
 
 ## Storage key contract (two-digit `mm`)
@@ -126,7 +136,7 @@ All paths use **UTC** year/month with **two-digit month** `mm`.
 
 - Raw ZIP: `raw/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip`
 - Filtered ZIP: `filtered/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip`
-- Road pack FlatGeobuf: `roadpacks/{councilSlug}/{version}/public-roads.fgb`
+- Road pack GeoJSON: `roadpacks/{councilSlug}/{version}/public-roads.geojson` (FlatGeobuf optional later)
 - Published layers: `published/{councilSlug}/roughness/latest.geojson` (and `anomalies`, `consensus`)
 - Published manifest: `published/{councilSlug}/manifest.json`
 

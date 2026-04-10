@@ -6,6 +6,8 @@ enum class SessionHostedPipelineState {
     QUEUED,
     UPLOADING,
     UPLOADED,
+    /** Auto-upload skipped locally (e.g. low road value); see upload_batches.uploadSkipReason. */
+    UPLOAD_SKIPPED,
     PROCESSING_REMOTE,
     COMPLETED,
     FAILED,

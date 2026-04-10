@@ -27,6 +27,8 @@ enum class BatchUploadState {
     FAILED_RETRYABLE,
     FAILED_PERMANENT,
     ACKED,
+    /** Auto-upload skipped (e.g. low road value); see [org.openlgx.roads.data.local.db.entity.UploadBatchEntity.uploadSkipReason]. */
+    SKIPPED,
 }
 
 /** Conservative eligibility labels; samples are retained and flagged, not hard-deleted on-device. */

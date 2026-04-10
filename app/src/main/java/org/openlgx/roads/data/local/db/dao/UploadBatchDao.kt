@@ -24,4 +24,27 @@ interface UploadBatchDao {
 
     @Query("SELECT MAX(lastSuccessfulUploadAtEpochMs) FROM upload_batches")
     suspend fun latestSuccessfulUploadAt(): Long?
+
+    @Query(
+        """
+        SELECT * FROM upload_batches WHERE sessionId = :sessionId
+        ORDER BY createdAtEpochMs DESC LIMIT 1
+        """,
+    )
+    suspend fun latestForSession(sessionId: Long): UploadBatchEntity?
+
+    @Query(
+        """
+        SELECT MAX(createdAtEpochMs) FROM upload_batches
+        WHERE batchUploadState IN ('UPLOADING','FAILED_RETRYABLE','FAILED_PERMANENT','ACKED')
+        """,
+    )
+    suspend fun latestUploadAttemptAt(): Long?
+
+    @Query(
+        """
+        SELECT * FROM upload_batches ORDER BY createdAtEpochMs DESC LIMIT 1
+        """,
+    )
+    suspend fun latestBatchOverall(): UploadBatchEntity?
 }

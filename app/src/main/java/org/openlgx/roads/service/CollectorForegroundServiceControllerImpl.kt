@@ -6,6 +6,7 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.openlgx.roads.debug.AgentDebugLog
 
 @Singleton
 class CollectorForegroundServiceControllerImpl
@@ -17,6 +18,14 @@ constructor(
     private val appContext = context.applicationContext
 
     override fun startCollectorService(sessionId: Long) {
+        // #region agent log
+        AgentDebugLog.emit(
+            hypothesisId = "H_FGS",
+            location = "CollectorForegroundServiceControllerImpl.kt:startCollectorService",
+            message = "startForegroundService_invoked",
+            data = mapOf("sessionId" to sessionId),
+        )
+        // #endregion
         val intent =
             Intent(appContext, CollectorForegroundService::class.java).apply {
                 action = CollectorForegroundService.ACTION_START

@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.work.Configuration
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
+import org.openlgx.roads.BuildConfig
+import org.openlgx.roads.debug.AgentDebugLog
 import org.openlgx.roads.di.HiltWorkerFactoryEntryPoint
 import org.openlgx.roads.di.PassiveCollectionEntryPoint
 import timber.log.Timber
@@ -28,6 +30,30 @@ class RoadsApplication : Application(), Configuration.Provider {
         super.onCreate()
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
+            // #region agent log
+            AgentDebugLog.install(this)
+            val prev = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { thread, exception ->
+                AgentDebugLog.appendSync(
+                    hypothesisId = "H_UC",
+                    location = "RoadsApplication.kt:onCreate",
+                    message = "defaultUncaughtExceptionHandler",
+                    data =
+                        mapOf(
+                            "thread" to (thread?.name ?: "null"),
+                            "ex" to exception.javaClass.simpleName,
+                            "msg" to (exception.message ?: ""),
+                        ),
+                )
+                prev?.uncaughtException(thread, exception)
+            }
+            AgentDebugLog.emit(
+                hypothesisId = "H_APP",
+                location = "RoadsApplication.kt:onCreate",
+                message = "application_onCreate_start",
+                data = emptyMap(),
+            )
+            // #endregion
         }
 
         EntryPointAccessors.fromApplication(this, PassiveCollectionEntryPoint::class.java)

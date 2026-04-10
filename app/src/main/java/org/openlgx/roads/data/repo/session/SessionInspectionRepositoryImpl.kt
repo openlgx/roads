@@ -43,6 +43,7 @@ constructor(
 
         val end = session.endedAtEpochMs ?: System.currentTimeMillis()
         val duration = (end - session.startedAtEpochMs).coerceAtLeast(0L)
+        val latestBatch = database.uploadBatchDao().latestForSession(sessionId)
 
         return SessionDetail(
             session = session,
@@ -52,6 +53,7 @@ constructor(
             lastSensorWallClockMs = lastSens,
             durationMs = duration,
             validation = validation,
+            latestUploadBatch = latestBatch,
         )
     }
 }

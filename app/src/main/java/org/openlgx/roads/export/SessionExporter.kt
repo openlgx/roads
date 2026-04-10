@@ -18,9 +18,14 @@ import org.json.JSONObject
 import org.openlgx.roads.BuildConfig
 import org.openlgx.roads.data.local.db.RoadsDatabase
 import org.openlgx.roads.data.local.settings.AppSettingsRepository
+import org.openlgx.roads.data.local.db.entity.AnomalyCandidateEntity
+import org.openlgx.roads.data.local.db.entity.DerivedWindowFeatureEntity
 import org.openlgx.roads.data.local.db.entity.DeviceProfileEntity
+import org.openlgx.roads.data.local.db.entity.LocationSampleEntity
 import org.openlgx.roads.data.local.db.entity.RecordingSessionEntity
 import org.openlgx.roads.data.repo.session.SessionInspectionRepository
+import org.openlgx.roads.roadpack.RoadFilterEngineConfig
+import org.openlgx.roads.roadpack.RoadPackFilterEngine
 import org.openlgx.roads.validation.SessionCaptureValidationSummary
 
 data class SessionExportResult(
@@ -100,6 +105,109 @@ constructor(
             }
         }
 
+    /**
+     * Filtered export: same canonical filenames as [exportSession]; additive [road_filter_summary.json]
+     * and optional additive manifest keys only.
+     */
+    suspend fun exportSessionFilteredForUpload(
+        sessionId: Long,
+        keptLocationIds: Set<Long>,
+        roadPackVersion: String?,
+        roadFilterSummaryJson: String,
+    ): Result<SessionExportResult> =
+        withContext(Dispatchers.IO) {
+            try {
+                val detail =
+                    sessionInspectionRepository.getSessionDetail(sessionId)
+                        ?: return@withContext Result.failure(IllegalArgumentException("Session not found"))
+                val session = detail.session
+                val root = File(context.getExternalFilesDir(null), "olgx_exports").apply { mkdirs() }
+                val folderName = "session_${session.uuid}_filtered_${System.currentTimeMillis()}"
+                val dir = File(root, folderName).apply { mkdirs() }
+
+                File(dir, "session.json").writeText(session.toExportJson().toString(2))
+
+                val allLoc = database.locationSampleDao().listAllForSessionOrdered(sessionId)
+                val keptLocs =
+                    allLoc.filter { keptLocationIds.contains(it.id) }
+                        .sortedBy { it.wallClockUtcEpochMs }
+                val ranges =
+                    RoadPackFilterEngine.mergeIntervalsForSensors(
+                        keptLocs,
+                        RoadFilterEngineConfig.sensorKeepMarginMs,
+                    )
+
+                writeLocationListCsvAndJson(dir, keptLocs)
+                val sensorKept = writeSensorCsvAndJsonFiltered(dir, sessionId, ranges)
+                val allDerived = database.derivedWindowFeatureDao().listForSessionOrdered(sessionId)
+                val derivedFiltered =
+                    allDerived.filter { rangesOverlapWallWindow(it, ranges) }
+                val derivedCount = writeDerivedWindowFeaturesList(dir, derivedFiltered)
+                val allAno = database.anomalyCandidateDao().listForSessionOrdered(sessionId)
+                val anoFiltered =
+                    allAno.filter { row ->
+                        val t = row.wallClockUtcEpochMs
+                        t == null || RoadPackFilterEngine.wallClockInAnyRange(t, ranges)
+                    }
+                val anomalyCount = writeAnomalyCandidatesList(dir, anoFiltered)
+
+                val profile = database.deviceProfileDao().firstOrNull()
+                val calibrationWorkflowEnabled =
+                    appSettingsRepository.settings.first().calibrationWorkflowEnabled
+                val additive =
+                    JSONObject().apply {
+                        put("roadFilterApplied", true)
+                        put("filterMethodVersion", RoadFilterEngineConfig.filterMethodVersion)
+                        if (roadPackVersion != null) {
+                            put("roadPackVersion", roadPackVersion)
+                        } else {
+                            put("roadPackVersion", JSONObject.NULL)
+                        }
+                    }
+                val manifest =
+                    buildManifest(
+                        exportDir = dir,
+                        session = session,
+                        locationCount = keptLocs.size.toLong(),
+                        sensorCount = sensorKept,
+                        derivedWindowFeatureCount = derivedCount,
+                        anomalyCandidateCount = anomalyCount,
+                        validation = detail.validation,
+                        deviceProfile = profile,
+                        calibrationWorkflowEnabled = calibrationWorkflowEnabled,
+                        additiveManifestKeys = additive,
+                    )
+                File(dir, "manifest.json").writeText(manifest.toString(2))
+                File(dir, "road_filter_summary.json").writeText(roadFilterSummaryJson)
+
+                val zipFile = File(root, "$folderName.zip")
+                zipDirectory(dir, zipFile)
+
+                exportDiagnosticsRepository.recordSuccess(
+                    directoryAbsolutePath = dir.absolutePath,
+                    zipAbsolutePath = zipFile.absolutePath,
+                    sessionId = sessionId,
+                )
+
+                Result.success(
+                    SessionExportResult(sessionId = sessionId, directory = dir, zipFile = zipFile),
+                )
+            } catch (e: Exception) {
+                exportDiagnosticsRepository.recordFailure(e.message ?: e::class.java.simpleName)
+                Result.failure(e)
+            }
+        }
+
+    private fun rangesOverlapWallWindow(
+        row: DerivedWindowFeatureEntity,
+        ranges: List<LongRange>,
+    ): Boolean {
+        val t0 = row.windowStartWallClockUtcEpochMs
+        val t1 = row.windowEndWallClockUtcEpochMs
+        if (t0 == null || t1 == null) return true
+        return ranges.any { r -> t0 <= r.last && t1 >= r.first }
+    }
+
     private fun buildManifest(
         exportDir: File,
         session: RecordingSessionEntity,
@@ -110,6 +218,7 @@ constructor(
         validation: SessionCaptureValidationSummary,
         deviceProfile: DeviceProfileEntity?,
         calibrationWorkflowEnabled: Boolean,
+        additiveManifestKeys: JSONObject? = null,
     ): JSONObject {
         val files =
             JSONArray().apply {
@@ -193,6 +302,13 @@ constructor(
             put("validationSummary", validationJson)
             put("calibrationWorkflowEnabled", calibrationWorkflowEnabled)
             put("calibrationLiteraturePointer", ExportConstants.CALIBRATION_LITERATURE_POINTER)
+            additiveManifestKeys?.let { add ->
+                val it = add.keys()
+                while (it.hasNext()) {
+                    val k = it.next()
+                    put(k, add.get(k))
+                }
+            }
         }
     }
 
@@ -244,6 +360,156 @@ constructor(
             }
             jw.write("\n  ]\n}\n")
         }
+    }
+
+    private fun writeLocationListCsvAndJson(
+        dir: File,
+        samples: List<LocationSampleEntity>,
+    ) {
+        val csv = File(dir, "location_samples.csv")
+        val json = File(dir, "location_samples.json")
+        var firstJson = true
+        BufferedWriter(json.writer(), DEFAULT_BUFFER_SIZE).use { jw ->
+            jw.write("{\n  \"samples\": [\n")
+            BufferedWriter(csv.writer(), DEFAULT_BUFFER_SIZE).use { cw ->
+                cw.write(
+                    "id,sessionId,elapsedRealtimeNanos,wallClockUtcEpochMs," +
+                        "latitude,longitude,speedMps,bearingDegrees,horizontalAccuracyMeters," +
+                        "altitudeMeters,roadEligibilityDisposition,eligibilityConfidence," +
+                        "retainedRegardlessOfEligibility\n",
+                )
+                for (row in samples) {
+                    if (!firstJson) jw.write(",\n")
+                    firstJson = false
+                    jw.write(row.toJson().toString())
+                    cw.write("${row.id},${row.sessionId},${row.elapsedRealtimeNanos},")
+                    cw.write("${row.wallClockUtcEpochMs},${row.latitude},${row.longitude},")
+                    cw.write("${row.speedMps ?: ""},${row.bearingDegrees ?: ""},")
+                    cw.write("${row.horizontalAccuracyMeters ?: ""},${row.altitudeMeters ?: ""},")
+                    cw.write("${row.roadEligibilityDisposition.name},")
+                    cw.write("${row.eligibilityConfidence ?: ""},${row.retainedRegardlessOfEligibility}\n")
+                }
+            }
+            jw.write("\n  ]\n}\n")
+        }
+    }
+
+    /** @return count of sensor rows written */
+    private suspend fun writeSensorCsvAndJsonFiltered(
+        dir: File,
+        sessionId: Long,
+        ranges: List<LongRange>,
+    ): Long {
+        val dao = database.sensorSampleDao()
+        val csv = File(dir, "sensor_samples.csv")
+        val json = File(dir, "sensor_samples.json")
+        val pageSize = 2000
+        var offset = 0
+        var firstJson = true
+        var count = 0L
+        BufferedWriter(json.writer(), DEFAULT_BUFFER_SIZE).use { jw ->
+            jw.write("{\n  \"samples\": [\n")
+            BufferedWriter(csv.writer(), DEFAULT_BUFFER_SIZE).use { cw ->
+                cw.write(
+                    "id,sessionId,elapsedRealtimeNanos,wallClockUtcEpochMs," +
+                        "sensorType,x,y,z,w,accuracy,roadEligibilityDisposition,eligibilityConfidence\n",
+                )
+                while (true) {
+                    val page = dao.pageForSessionOrdered(sessionId, pageSize, offset)
+                    if (page.isEmpty()) break
+                    for (row in page) {
+                        if (!RoadPackFilterEngine.wallClockInAnyRange(row.wallClockUtcEpochMs, ranges)) {
+                            continue
+                        }
+                        if (!firstJson) jw.write(",\n")
+                        firstJson = false
+                        jw.write(row.toJson().toString())
+                        cw.write("${row.id},${row.sessionId},${row.elapsedRealtimeNanos},")
+                        cw.write("${row.wallClockUtcEpochMs},${row.sensorType},")
+                        cw.write("${row.x},${row.y},${row.z},${row.w ?: ""},${row.accuracy ?: ""},")
+                        cw.write(
+                            "${row.roadEligibilityDisposition.name}," +
+                                "${row.eligibilityConfidence ?: ""}\n",
+                        )
+                        count++
+                    }
+                    offset += page.size
+                }
+            }
+            jw.write("\n  ]\n}\n")
+        }
+        return count
+    }
+
+    private fun writeDerivedWindowFeaturesList(
+        dir: File,
+        rows: List<DerivedWindowFeatureEntity>,
+    ): Int {
+        val csv = File(dir, "derived_window_features.csv")
+        val json = File(dir, "derived_window_features.json")
+        BufferedWriter(json.writer(), DEFAULT_BUFFER_SIZE).use { jw ->
+            jw.write("{\n  \"windows\": [\n")
+            BufferedWriter(csv.writer(), DEFAULT_BUFFER_SIZE).use { cw ->
+                cw.write(
+                    "id,sessionId,windowStartElapsedNanos,windowEndElapsedNanos," +
+                        "windowLengthMetersApprox,methodVersion,isExperimental,roughnessProxyScore," +
+                        "roadResponseScore,qualityFlags,roadEligibilityDisposition,eligibilityConfidence," +
+                        "featureBundleJson,windowStartWallClockUtcEpochMs,windowEndWallClockUtcEpochMs," +
+                        "midLatitude,midLongitude,meanSpeedMps,headingMeanDeg,predPrimaryLabel," +
+                        "scoreCornering,scoreVerticalShock,scoreStableCruise,windowIndex\n",
+                )
+                rows.forEachIndexed { index, row ->
+                    if (index > 0) jw.write(",\n")
+                    jw.write(row.toExportJson().toString())
+                    cw.write("${row.id},${row.sessionId},${row.windowStartElapsedNanos},")
+                    cw.write("${row.windowEndElapsedNanos},${row.windowLengthMetersApprox ?: ""},")
+                    cw.write("${row.methodVersion ?: ""},${row.isExperimental},")
+                    cw.write("${row.roughnessProxyScore ?: ""},${row.roadResponseScore ?: ""},")
+                    cw.write("${row.qualityFlags},${row.roadEligibilityDisposition.name},")
+                    cw.write("${row.eligibilityConfidence ?: ""},${csvEscape(row.featureBundleJson)},")
+                    cw.write("${row.windowStartWallClockUtcEpochMs ?: ""},")
+                    cw.write("${row.windowEndWallClockUtcEpochMs ?: ""},")
+                    cw.write("${row.midLatitude ?: ""},${row.midLongitude ?: ""},")
+                    cw.write("${row.meanSpeedMps ?: ""},${row.headingMeanDeg ?: ""},")
+                    cw.write("${row.predPrimaryLabel ?: ""},${row.scoreCornering ?: ""},")
+                    cw.write("${row.scoreVerticalShock ?: ""},${row.scoreStableCruise ?: ""},")
+                    cw.write("${row.windowIndex ?: ""}\n")
+                }
+            }
+            jw.write("\n  ]\n}\n")
+        }
+        return rows.size
+    }
+
+    private fun writeAnomalyCandidatesList(
+        dir: File,
+        rows: List<AnomalyCandidateEntity>,
+    ): Int {
+        val csv = File(dir, "anomaly_candidates.csv")
+        val json = File(dir, "anomaly_candidates.json")
+        BufferedWriter(json.writer(), DEFAULT_BUFFER_SIZE).use { jw ->
+            jw.write("{\n  \"anomalies\": [\n")
+            BufferedWriter(csv.writer(), DEFAULT_BUFFER_SIZE).use { cw ->
+                cw.write(
+                    "id,sessionId,timeElapsedRealtimeNanos,anomalyType,score,confidence," +
+                        "methodVersion,qualityFlags,detailsJson,wallClockUtcEpochMs,latitude," +
+                        "longitude,speedMps,headingDeg,severityBucket,derivedWindowId\n",
+                )
+                rows.forEachIndexed { index, row ->
+                    if (index > 0) jw.write(",\n")
+                    jw.write(row.toExportJson().toString())
+                    cw.write("${row.id},${row.sessionId},${row.timeElapsedRealtimeNanos ?: ""},")
+                    cw.write("${row.anomalyType.name},${row.score ?: ""},${row.confidence ?: ""},")
+                    cw.write("${row.methodVersion ?: ""},${row.qualityFlags},")
+                    cw.write("${csvEscape(row.detailsJson)},${row.wallClockUtcEpochMs ?: ""},")
+                    cw.write("${row.latitude ?: ""},${row.longitude ?: ""},")
+                    cw.write("${row.speedMps ?: ""},${row.headingDeg ?: ""},")
+                    cw.write("${row.severityBucket ?: ""},${row.derivedWindowId ?: ""}\n")
+                }
+            }
+            jw.write("\n  ]\n}\n")
+        }
+        return rows.size
     }
 
     private suspend fun writeDerivedWindowFeaturesCsvAndJson(

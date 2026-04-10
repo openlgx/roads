@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.openlgx.roads.R
 import org.openlgx.roads.collector.lifecycle.CollectorLifecycleState
+import org.openlgx.roads.debug.AgentDebugLog
 import org.openlgx.roads.location.LocationRecordingController
 import org.openlgx.roads.sensor.SensorRecordingController
 
@@ -77,6 +78,14 @@ class CollectorForegroundService : Service() {
             }
             else -> {
                 val sessionId = intent?.getLongExtra(EXTRA_SESSION_ID, -1L) ?: -1L
+                // #region agent log
+                AgentDebugLog.emit(
+                    hypothesisId = "H_FGS",
+                    location = "CollectorForegroundService.kt:onStartCommand",
+                    message = "onStartCommand_start_branch",
+                    data = mapOf("sessionId" to sessionId),
+                )
+                // #endregion
                 if (sessionId <= 0L) {
                     stopSelf()
                     return START_NOT_STICKY
@@ -103,6 +112,14 @@ class CollectorForegroundService : Service() {
                     startForeground(NOTIFICATION_ID, notification)
                 }
 
+                // #region agent log
+                AgentDebugLog.emit(
+                    hypothesisId = "H_FGS",
+                    location = "CollectorForegroundService.kt:onStartCommand",
+                    message = "before_location_sensor_startRecording",
+                    data = mapOf("sessionId" to sessionId),
+                )
+                // #endregion
                 locationRecordingController.startRecording(sessionId)
                 sensorRecordingController.startRecording(sessionId)
             }

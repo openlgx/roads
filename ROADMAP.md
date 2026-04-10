@@ -10,18 +10,19 @@ It is written to align the Android collector, offline analysis tooling, future b
 ## Current status snapshot
 
 ### What is built now
+- **Pilot readiness slice:** [docs/pilot-readiness.md](docs/pilot-readiness.md) documents one-council / one-device rollout; scripts `backend/scripts/pilot_preflight.py`, `pilot_smoke_e2e.py`, `seed_pilot_council.py`; Settings hosted diagnostics; `uploads-complete` storage size verification; manifest `refreshCadenceNote`.
 - Android collector foundation is in place.
 - Passive trip lifecycle exists, including STOP_HOLD-style trip continuity at intersections / short stops.
 - Fused GNSS capture and IMU capture are persisted locally.
-- Room DB is at **v5** with on-device **processing** columns plus **hosted pipeline** visibility (`hostedPipelineState`) and extended **`upload_batches`** for the upload queue.
+- Room DB is at **v6** with on-device **processing** columns plus **hosted pipeline** visibility (`hostedPipelineState`) and **`upload_batches`** extended with **filter/skip** metadata (`filterChangedPayload`, `uploadSkipReason`, `SKIPPED` state).
 - Session review exists on device, including WebView-based trip review and all-runs review.
 - On-device roughness/anomaly processing exists and is explicitly marked experimental.
 - Local export bundles include raw and derived artifacts.
 - Offline Python analysis tooling remains available and should continue to be the research bench.
-- **Hosted alpha foundation (in-repo):** Neon SQL migrations, Supabase Edge Functions (`uploads-create` / `uploads-complete` / `healthz` / `council-layers-*`), Python publish (`publish_council_layers.py`, fail-closed without boundary), processing scaffold, road-pack build script, GitHub Actions workflows, and Android **WorkManager** upload path + **road pack** loading / GeoJSON index / filtered export hooks (see [docs/backend.md](docs/backend.md), [docs/api-contract.md](docs/api-contract.md)).
+- **Hosted alpha foundation (in-repo):** Neon SQL migrations, Supabase Edge Functions (`uploads-create` / `uploads-complete` / `healthz` / `council-layers-*`), Python **`publish_council_layers.py`** (LGA-clipped layers from `*_hosted` tables, consensus density gate, fail-closed without boundary), Python **`run_processing_job.py`** (roughness_lab-derived windows + anomalies into `derived_window_features_hosted` / `anomaly_candidates_hosted`; delete-and-rebuild after **RUNNING**), road-pack build script, GitHub Actions workflows, and Android **WorkManager** upload with **real GeoJSON road index**, **`RoadFilterEngineConfig`** cadence/thresholds, **low-value upload skip**, and filtered zips (see [docs/backend.md](docs/backend.md), [docs/api-contract.md](docs/api-contract.md)).
 
 ### What is not yet production-ready
-- **Hosted pipeline is alpha:** server-side processing to full hosted roughness is still largely scaffolded; production keys, real LGA boundaries, and field-hardening are required before council-facing claims.
+- **Hosted pipeline is alpha:** hosted worker + publish are now **functional** on the research stack, but production keys, authoritative LGA boundaries everywhere, calibration, and field-hardening remain before council-facing claims.
 - No model training pipeline is implemented.
 - No calibrated IRI model exists.
 - No robust road-network map matching exists on device beyond pack-based proximity (no live OSM requirement by design for alpha).
