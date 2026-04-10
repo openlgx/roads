@@ -6,9 +6,11 @@ An open-source Android-first platform for collecting, processing, and publishing
 
 ## Project status
 
-Early development / architecture phase.
+The app is now a **local-first Android collector plus experimental on-device analysis and review** (Room v4, heuristic roughness windows, exports with derived artifacts). It is **not** yet an end-to-end networked product: **backend ingestion, shared cloud database, labelling/training pipelines, calibration to IRI, and production ops** are still out of scope for this repo until Phase 5+.
 
-This repository is the starting point for the **OLGX Roads** collector application and supporting documentation. The first implementation target is a **native Android application in Kotlin** that records road trip sensor data, stores it locally, and supports calibration and validation workflows for road roughness estimation.
+**Authoritative phased plan:** see [ROADMAP.md](ROADMAP.md). **Planned server shape (metadata in Neon, blobs in object storage):** see [docs/backend.md](docs/backend.md).
+
+This repository centers on a **native Android application in Kotlin** that records road trip sensor data, processes trips on-device for screening/review, stores data locally, and exports bundles suitable for future upload and research workflows.
 
 ### Android app (Phase 0 / 1)
 
