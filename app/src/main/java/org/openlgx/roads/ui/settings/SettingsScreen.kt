@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.openlgx.roads.data.local.settings.CaptureSettingsPreset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,13 +116,64 @@ fun SettingsScreen(
                 onCheckedChange = viewModel::setLocalCompactionEnabled,
             )
 
-            Text("Capture heuristics (placeholder for Phase 2)", style = MaterialTheme.typography.titleMedium)
+            Text("Passive capture detection", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Minimum speed (m/s) for eligibility: ${"%.1f".format(settings.captureMinSpeedMps)}",
+                "Tune arming and stop-hold (experimental). Field presets below apply speed gates and hold duration.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            SettingToggleRow(
+                title = "Fast arming",
+                checked = settings.captureFastArmingEnabled,
+                onCheckedChange = viewModel::setCaptureFastArmingEnabled,
+                supporting =
+                    "When on, strong in-vehicle + speed evidence uses a shorter debounce before recording.",
+            )
+            Text(
+                "Start speed gate (m/s): ${"%.1f".format(settings.captureStartSpeedMps)} · " +
+                    "Immediate-start threshold: ${"%.1f".format(settings.captureImmediateStartSpeedMps)} · " +
+                    "Stop speed (m/s): ${"%.1f".format(settings.captureStopSpeedMps)}",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Button(onClick = { viewModel.setCaptureMinSpeedMps(3.0f) }) { Text("Min speed: 3.0 m/s") }
-            Button(onClick = { viewModel.setCaptureMinSpeedMps(5.0f) }) { Text("Min speed: 5.0 m/s") }
+            Text(
+                "Stop-hold: ${settings.captureStopHoldSeconds}s · Stationary radius: " +
+                    "${"%.0f".format(settings.captureStationaryRadiusMeters)} m",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text("Quick presets", style = MaterialTheme.typography.titleSmall)
+            Button(onClick = { viewModel.applyCapturePreset(CaptureSettingsPreset.CONSERVATIVE) }) {
+                Text("Conservative")
+            }
+            Button(onClick = { viewModel.applyCapturePreset(CaptureSettingsPreset.NORMAL) }) {
+                Text("Normal")
+            }
+            Button(onClick = { viewModel.applyCapturePreset(CaptureSettingsPreset.FAST_ARMING) }) {
+                Text("Fast arming")
+            }
+            Button(onClick = { viewModel.setCaptureStopHoldSeconds(120) }) {
+                Text("Hold: 2 min (quick test)")
+            }
+            Button(onClick = { viewModel.setCaptureStopHoldSeconds(180) }) {
+                Text("Hold: 3 min (default)")
+            }
+
+            Text("On-device processing (experimental)", style = MaterialTheme.typography.titleMedium)
+            SettingToggleRow(
+                title = "Process session after recording completes",
+                checked = settings.processingLiveAfterSessionEnabled,
+                onCheckedChange = viewModel::setProcessingLiveAfterSessionEnabled,
+            )
+            SettingToggleRow(
+                title = "All-runs map: consensus overlay default on",
+                checked = settings.processingAllRunsOverlayEnabled,
+                onCheckedChange = viewModel::setProcessingAllRunsOverlayEnabled,
+            )
+            Text(
+                "Window: ${"%.2f".format(settings.processingWindowSeconds)} s · Distance bin: " +
+                    "${"%.0f".format(settings.processingDistanceBinMeters)} m",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(onClick = { viewModel.setProcessingWindowSeconds(1.0f) }) { Text("Window: 1.0 s") }
+            Button(onClick = { viewModel.setProcessingDistanceBinMeters(10f) }) { Text("Bin: 10 m") }
 
             Text("Developer", style = MaterialTheme.typography.titleMedium)
             SettingToggleRow(

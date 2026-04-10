@@ -14,4 +14,9 @@ data class SessionListStats(
     @ColumnInfo(name = "recordingSource") val recordingSource: RecordingSource,
     @ColumnInfo(name = "locationSampleCount") val locationSampleCount: Long,
     @ColumnInfo(name = "sensorSampleCount") val sensorSampleCount: Long,
+    @ColumnInfo(name = "processingState") val processingState: SessionProcessingState,
+    @ColumnInfo(name = "derivedWindowCount") val derivedWindowCount: Long,
+    @ColumnInfo(name = "anomalyCount") val anomalyCount: Long,
+    @ColumnInfo(name = "roughnessProxyScore") val roughnessProxyScore: Double?,
+    @ColumnInfo(name = "processingLastError") val processingLastError: String?,
 )

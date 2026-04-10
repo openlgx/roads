@@ -9,4 +9,9 @@ object Routes {
     const val SessionDetailBase = "session"
     const val SessionDetail = "session/{sessionId}"
     fun sessionDetail(sessionId: Long): String = "session/$sessionId"
+
+    const val SessionReview = "session/{sessionId}/review"
+    fun sessionReview(sessionId: Long): String = "session/$sessionId/review"
+
+    const val AllRunsReview = "review/all-runs"
 }

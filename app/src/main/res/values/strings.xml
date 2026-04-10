@@ -6,4 +6,13 @@
     <string name="collector_notification_title">OLGX Roads collector</string>
     <string name="collector_notification_body">Passive lifecycle active (no continuous sensors yet).</string>
     <string name="collector_notification_body_location">Recording location for an active session (Phase 2B1).</string>
+    <string name="collector_notification_body_arming">Arming capture — stay in vehicle until motion is confirmed.</string>
+    <string name="collector_notification_body_recording">Recording trip %1$s — GNSS + motion active.</string>
+    <string name="collector_notification_body_stop_hold">Holding session %1$s open at stop (still recording).</string>
+    <string name="recording_events_channel_name">Recording events</string>
+    <string name="recording_events_channel_description">Short alerts when a recording session starts or stops.</string>
+    <string name="recording_started_title">Recording started</string>
+    <string name="recording_started_body">OLGX Roads is now capturing trip%1$s (experimental).</string>
+    <string name="recording_stopped_title">Recording stopped</string>
+    <string name="recording_stopped_body">Capture ended for trip%1$s — status %2$s.</string>
 </resources>

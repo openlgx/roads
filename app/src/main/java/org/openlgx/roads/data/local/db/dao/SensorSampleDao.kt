@@ -47,6 +47,12 @@ interface SensorSampleDao {
     ): List<SensorSampleEntity>
 
     @Query(
+        "SELECT * FROM sensor_samples WHERE sessionId = :sessionId " +
+            "ORDER BY wallClockUtcEpochMs ASC",
+    )
+    suspend fun listAllForSessionOrdered(sessionId: Long): List<SensorSampleEntity>
+
+    @Query(
         "SELECT DISTINCT sensorType FROM sensor_samples WHERE sessionId = :sessionId ORDER BY sensorType",
     )
     suspend fun distinctSensorTypesForSession(sessionId: Long): List<Int>

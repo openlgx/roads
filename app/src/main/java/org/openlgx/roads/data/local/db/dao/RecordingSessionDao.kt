@@ -6,6 +6,7 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 import org.openlgx.roads.data.local.db.entity.RecordingSessionEntity
 import org.openlgx.roads.data.local.db.model.SessionListStats
+import org.openlgx.roads.data.local.db.model.SessionProcessingState
 import org.openlgx.roads.data.local.db.model.SessionState
 
 @Dao
@@ -28,6 +29,9 @@ interface RecordingSessionDao {
     @Query("SELECT * FROM recording_sessions WHERE id = :sessionId LIMIT 1")
     suspend fun getById(sessionId: Long): RecordingSessionEntity?
 
+    @Query("SELECT * FROM recording_sessions WHERE id = :sessionId LIMIT 1")
+    fun observeById(sessionId: Long): Flow<RecordingSessionEntity?>
+
     @Query(
         """
         SELECT 
@@ -44,12 +48,44 @@ interface RecordingSessionDao {
           IFNULL(
             (SELECT COUNT(*) FROM sensor_samples x WHERE x.sessionId = s.id),
             0
-          ) AS sensorSampleCount
+          ) AS sensorSampleCount,
+          s.processingState AS processingState,
+          IFNULL(
+            (SELECT COUNT(*) FROM derived_window_features d WHERE d.sessionId = s.id),
+            0
+          ) AS derivedWindowCount,
+          IFNULL(
+            (SELECT COUNT(*) FROM anomaly_candidates a WHERE a.sessionId = s.id),
+            0
+          ) AS anomalyCount,
+          s.roughnessProxyScore AS roughnessProxyScore,
+          s.processingLastError AS processingLastError
         FROM recording_sessions s
         ORDER BY s.startedAtEpochMs DESC
         """,
     )
     fun observeSessionListStats(): Flow<List<SessionListStats>>
+
+    @Query("SELECT * FROM recording_sessions ORDER BY startedAtEpochMs DESC")
+    suspend fun listAllSessionsOrdered(): List<RecordingSessionEntity>
+
+    /**
+     * Completed drives that should get on-device roughness windows:
+     * never ran, or failed (e.g. old bug) and can be retried automatically.
+     */
+    @Query(
+        """
+        SELECT id FROM recording_sessions
+        WHERE state = 'COMPLETED'
+          AND processingState IN ('NOT_STARTED', 'FAILED')
+          AND (
+            SELECT COUNT(*) FROM location_samples l WHERE l.sessionId = recording_sessions.id
+          ) >= 2
+        ORDER BY startedAtEpochMs DESC
+        LIMIT 80
+        """,
+    )
+    suspend fun listCompletedSessionIdsPendingProcessing(): List<Long>
 
     @Query(
         "UPDATE recording_sessions SET endedAtEpochMs = :endedAtEpochMs, state = :state WHERE id = :sessionId",
@@ -60,4 +96,42 @@ interface RecordingSessionDao {
         "UPDATE recording_sessions SET sensorCaptureSnapshotJson = :json WHERE id = :sessionId",
     )
     suspend fun updateSensorCaptureSnapshot(sessionId: Long, json: String?)
+
+    @Query(
+        """
+        UPDATE recording_sessions SET
+          processingState = :processingState,
+          processingStartedAtEpochMs = :processingStartedAtEpochMs,
+          processingCompletedAtEpochMs = :processingCompletedAtEpochMs,
+          processingLastError = :processingLastError,
+          processingSummaryJson = :processingSummaryJson
+        WHERE id = :sessionId
+        """,
+    )
+    suspend fun updateProcessingFields(
+        sessionId: Long,
+        processingState: SessionProcessingState,
+        processingStartedAtEpochMs: Long?,
+        processingCompletedAtEpochMs: Long?,
+        processingLastError: String?,
+        processingSummaryJson: String?,
+    )
+
+    @Query(
+        """
+        UPDATE recording_sessions SET
+          roughnessProxyScore = :roughnessProxy,
+          roughnessMethodVersion = :roughnessMethodVersion,
+          roadResponseScore = :roadResponse,
+          roadResponseMethodVersion = :roadResponseMethodVersion
+        WHERE id = :sessionId
+        """,
+    )
+    suspend fun updateAggregateScores(
+        sessionId: Long,
+        roughnessProxy: Double?,
+        roughnessMethodVersion: String?,
+        roadResponse: Double?,
+        roadResponseMethodVersion: String?,
+    )
 }

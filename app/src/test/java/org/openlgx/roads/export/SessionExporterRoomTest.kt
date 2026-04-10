@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.local.settings.AppSettingsRepository
+import org.openlgx.roads.data.local.settings.CaptureSettingsPreset
+import org.openlgx.roads.data.local.settings.testAppSettings
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Before
@@ -88,28 +90,39 @@ class SessionExporterRoomTest {
 
         override suspend fun setCaptureMinSpeedMps(mps: Float) = Unit
 
+        override suspend fun setCaptureStartSpeedMps(mps: Float) = Unit
+
+        override suspend fun setCaptureImmediateStartSpeedMps(mps: Float) = Unit
+
+        override suspend fun setCaptureStopSpeedMps(mps: Float) = Unit
+
+        override suspend fun setCaptureStopHoldSeconds(seconds: Int) = Unit
+
+        override suspend fun setCaptureStationaryRadiusMeters(meters: Float) = Unit
+
+        override suspend fun setCaptureFastArmingEnabled(enabled: Boolean) = Unit
+
+        override suspend fun setProcessingWindowSeconds(seconds: Float) = Unit
+
+        override suspend fun setProcessingDistanceBinMeters(meters: Float) = Unit
+
+        override suspend fun setProcessingLiveAfterSessionEnabled(enabled: Boolean) = Unit
+
+        override suspend fun setProcessingAllRunsOverlayEnabled(enabled: Boolean) = Unit
+
+        override suspend fun applyCapturePreset(preset: CaptureSettingsPreset) = Unit
+
         override suspend fun setDebugModeEnabled(enabled: Boolean) = Unit
 
         override suspend fun setCalibrationWorkflowEnabled(enabled: Boolean) = Unit
+
+        override suspend fun recordRecordingStartedAt(epochMs: Long) = Unit
+
+        override suspend fun recordRecordingStoppedAt(epochMs: Long) = Unit
     }
 
     private fun defaultSettings(calibrationWorkflow: Boolean = false): AppSettings =
-        AppSettings(
-            onboardingCompleted = true,
-            passiveCollectionUserEnabled = true,
-            passiveCollectionEffective = true,
-            uploadWifiOnly = true,
-            uploadAllowCellular = false,
-            uploadOnlyWhileCharging = false,
-            uploadPauseOnLowBatteryEnabled = true,
-            uploadLowBatteryThresholdPercent = 20,
-            retentionDays = 30,
-            maxLocalStorageMb = 0,
-            localCompactionEnabled = false,
-            captureMinSpeedMps = 4.5f,
-            debugModeEnabled = false,
-            calibrationWorkflowEnabled = calibrationWorkflow,
-        )
+        testAppSettings().copy(calibrationWorkflowEnabled = calibrationWorkflow)
 
     @Before
     fun setup() {
@@ -179,11 +192,18 @@ class SessionExporterRoomTest {
             assertThat(File(bundle.directory, "location_samples.json").exists()).isTrue()
             assertThat(File(bundle.directory, "sensor_samples.csv").exists()).isTrue()
             assertThat(File(bundle.directory, "sensor_samples.json").exists()).isTrue()
+            assertThat(File(bundle.directory, "derived_window_features.csv").exists()).isTrue()
+            assertThat(File(bundle.directory, "derived_window_features.json").exists()).isTrue()
+            assertThat(File(bundle.directory, "anomaly_candidates.csv").exists()).isTrue()
+            assertThat(File(bundle.directory, "anomaly_candidates.json").exists()).isTrue()
             assertThat(bundle.zipFile.exists()).isTrue()
 
             val manifest = JSONObject(File(bundle.directory, "manifest.json").readText())
             assertThat(manifest.getInt("exportSchemaVersion")).isEqualTo(ExportConstants.EXPORT_SCHEMA_VERSION)
             assertThat(manifest.getString("exportMethodVersion")).isEqualTo(ExportConstants.EXPORT_METHOD_VERSION)
+            assertThat(manifest.has("processing")).isTrue()
+            assertThat(manifest.getInt("derivedWindowFeatureCount")).isEqualTo(0)
+            assertThat(manifest.getInt("anomalyCandidateCount")).isEqualTo(0)
             assertThat(manifest.has("validationSummary")).isTrue()
             assertThat(manifest.getLong("sessionId")).isEqualTo(sessionId)
             assertThat(manifest.getBoolean("calibrationWorkflowEnabled")).isTrue()

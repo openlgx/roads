@@ -27,9 +27,36 @@ interface AppSettingsRepository {
 
     suspend fun setLocalCompactionEnabled(enabled: Boolean)
 
+    /** @deprecated Legacy; prefer [setCaptureStartSpeedMps]. Writes both keys for migration. */
     suspend fun setCaptureMinSpeedMps(mps: Float)
+
+    suspend fun setCaptureStartSpeedMps(mps: Float)
+
+    suspend fun setCaptureImmediateStartSpeedMps(mps: Float)
+
+    suspend fun setCaptureStopSpeedMps(mps: Float)
+
+    suspend fun setCaptureStopHoldSeconds(seconds: Int)
+
+    suspend fun setCaptureStationaryRadiusMeters(meters: Float)
+
+    suspend fun setCaptureFastArmingEnabled(enabled: Boolean)
+
+    suspend fun setProcessingWindowSeconds(seconds: Float)
+
+    suspend fun setProcessingDistanceBinMeters(meters: Float)
+
+    suspend fun setProcessingLiveAfterSessionEnabled(enabled: Boolean)
+
+    suspend fun setProcessingAllRunsOverlayEnabled(enabled: Boolean)
+
+    suspend fun applyCapturePreset(preset: CaptureSettingsPreset)
 
     suspend fun setDebugModeEnabled(enabled: Boolean)
 
     suspend fun setCalibrationWorkflowEnabled(enabled: Boolean)
+
+    suspend fun recordRecordingStartedAt(epochMs: Long = System.currentTimeMillis())
+
+    suspend fun recordRecordingStoppedAt(epochMs: Long = System.currentTimeMillis())
 }

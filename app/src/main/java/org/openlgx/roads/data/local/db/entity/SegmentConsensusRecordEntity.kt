@@ -6,7 +6,10 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "segment_consensus_records",
-    indices = [Index(value = ["segmentKey"], unique = true)],
+    indices = [
+        Index(value = ["segmentKey"], unique = true),
+        Index(value = ["centroidLatitude", "centroidLongitude"]),
+    ],
 )
 data class SegmentConsensusRecordEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -17,4 +20,7 @@ data class SegmentConsensusRecordEntity(
     val stabilityScore: Float? = null,
     val methodVersion: String? = null,
     val lastUpdatedEpochMs: Long? = null,
+    val centroidLatitude: Double? = null,
+    val centroidLongitude: Double? = null,
+    val binSizeMetersApprox: Int? = null,
 )

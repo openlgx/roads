@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +27,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -41,7 +47,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.text.DateFormat
 import org.openlgx.roads.collector.lifecycle.CollectorLifecycleState
+import org.openlgx.roads.data.local.db.model.SessionListStats
+import org.openlgx.roads.data.local.db.model.SessionProcessingState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +59,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenDiagnostics: () -> Unit,
     onOpenSessions: () -> Unit,
+    onOpenAllRunsReview: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val collector = state.collector
@@ -235,122 +245,155 @@ fun HomeScreen(
                 }
             }
 
-            // --- Passive collection status ---
-            HomeSectionTitle("Passive collection status")
+            // --- Status at a glance (field testing) ---
+            HomeSectionTitle("Status")
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    StatusLabeledChip(
-                        label = "Passive collection",
-                        value = if (passiveCollectionActive) "Active" else "Not active",
-                        positive = passiveCollectionActive,
-                    )
-                    StatusLabeledChip(
-                        label = "Permissions",
-                        value = if (allRequiredPermissionsGranted) "Ready" else "Action required",
-                        positive = allRequiredPermissionsGranted,
-                    )
-                    StatusLabeledChip(
-                        label = "Collector state",
-                        value = collectorStateDisplay(collector.lifecycleState),
-                        positive =
-                            collector.lifecycleState != CollectorLifecycleState.PAUSED_POLICY &&
-                                collector.lifecycleState != CollectorLifecycleState.DEGRADED,
-                    )
-                    StatusLabeledChip(
-                        label = "Recording active",
-                        value = if (collector.recordingActive) "Yes" else "No",
-                        positive = collector.recordingActive,
-                    )
-                }
-            }
-
-            // --- Collector runtime ---
-            HomeSectionTitle("Collector runtime")
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    SummaryLine(
-                        label = "Listening for trips",
-                        value = if (passivePipelineListening) "Yes" else "No",
-                    )
-                    SummaryLine(
-                        label = "In vehicle (estimate)",
-                        value =
-                            when {
-                                collector.likelyInVehicle -> "Likely yes"
-                                collector.activityRecognitionUpdatesActive -> "Likely no"
-                                else -> "Unknown"
-                            },
-                    )
-                    SummaryLine(
-                        label = "Current activity",
-                        value =
-                            "${collector.lastActivityLabel} (${collector.lastActivityConfidence}% confidence)",
-                    )
-                    SummaryLine(
-                        label = "Background recording service",
-                        value = if (collector.foregroundServiceRunning) "Running" else "Not running",
-                    )
-                }
-            }
-
-            // --- Recording summary ---
-            HomeSectionTitle("Recording summary")
-            val sensorState = state.sensorRecording
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    SummaryLine(
-                        label = "Trips saved on device",
-                        value = state.recordingSessionCount.toString(),
-                    )
-                    SummaryLine(
-                        label = "Upload policy",
-                        value =
-                            if (state.uploadWifiOnly) "Wi‑Fi only" else "Wi‑Fi preferred",
+                    Text(
+                        tripCaptureHeadline(collector.lifecycleState),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                     Text(
-                        state.pendingUploadSummaryPlaceholder,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        collectorStateDisplay(collector.lifecycleState),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
                     )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
+
                     Text(
-                        "While recording",
+                        "What you need for trips to work",
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                     )
-                    SummaryLine(
-                        label = "GPS samples (approx.)",
-                        value = state.locationRecording.publishedSampleCount.toString(),
-                    )
-                    SummaryLine(
-                        label = "Motion sampling",
-                        value =
+
+                    val setupOk = state.onboardingCompleted && state.passiveCollectionEffective
+                    HomeReadinessRow(
+                        title = "Setup & trip capture enabled",
+                        subtitle =
                             when {
-                                !sensorState.recordingSensors -> "Idle"
-                                sensorState.degradedRecording -> "Active (reduced quality)"
-                                else -> "Active"
+                                !state.onboardingCompleted ->
+                                    "Finish setup above so passive recording can run."
+                                !state.passiveCollectionEffective ->
+                                    "Passive collection is off — turn it on in Settings or complete setup."
+                                else -> "Onboarding done and passive collection is active."
                             },
+                        kind =
+                            if (setupOk) {
+                                HomeReadinessKind.Ok
+                            } else {
+                                HomeReadinessKind.NeedsWork
+                            },
+                    )
+
+                    HomeReadinessRow(
+                        title = "Permissions",
+                        subtitle =
+                            if (allRequiredPermissionsGranted) {
+                                "Location (and activity recognition / notifications if required on this Android version) are granted."
+                            } else {
+                                "Grant the items in the Permissions card above before trips can run reliably."
+                            },
+                        kind = if (allRequiredPermissionsGranted) HomeReadinessKind.Ok else HomeReadinessKind.NeedsWork,
+                    )
+
+                    val listeningKind: HomeReadinessKind =
+                        when {
+                            !state.passiveCollectionEffective ->
+                                HomeReadinessKind.InProgress
+                            passivePipelineListening -> HomeReadinessKind.Ok
+                            else -> HomeReadinessKind.NeedsWork
+                        }
+                    val listeningSubtitle =
+                        when {
+                            !state.passiveCollectionEffective ->
+                                "Passive collection is off — trip detection is idle until you enable it."
+                            passivePipelineListening ->
+                                "Activity recognition updates are active; the app can notice vehicle motion."
+                            else ->
+                                "Activity recognition is not active — allow permission or open the app so updates resume."
+                        }
+                    HomeReadinessRow(
+                        title = "Trip detection listening",
+                        subtitle = listeningSubtitle,
+                        kind = listeningKind,
+                    )
+
+                    HomeReadinessRow(
+                        title = "Ready to capture trips",
+                        subtitle =
+                            if (passiveCollectionActive) {
+                                "All checks above pass — start driving to begin a trip automatically."
+                            } else {
+                                "One or more checks above still need attention before automatic trips can run."
+                            },
+                        kind = if (passiveCollectionActive) HomeReadinessKind.Ok else HomeReadinessKind.NeedsWork,
+                    )
+
+                    HomeReadinessRow(
+                        title = "Recording a trip right now",
+                        subtitle =
+                            if (collector.recordingActive) {
+                                "Location and motion sampling are active for the current session."
+                            } else {
+                                "You are not recording — that is normal while parked or when no trip is active."
+                            },
+                        kind =
+                            if (collector.recordingActive) {
+                                HomeReadinessKind.Ok
+                            } else {
+                                HomeReadinessKind.InProgress
+                            },
+                    )
+
+                    collector.activeSessionId?.let { sid ->
+                        Text(
+                            "Active session #$sid",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
+                        )
+                    }
+
+                    state.latestSessionSummary?.let { latest ->
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
+                        val (procKind, procTitle, procSubtitle) = latestTripProcessingReadiness(latest)
+                        HomeReadinessRow(title = procTitle, subtitle = procSubtitle, kind = procKind)
+                        Text(
+                            "Trips on device: ${state.recordingSessionCount}. Open Recorded sessions for maps and charts.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
+                    Text(
+                        "Last trip recording started: ${formatHomeEventTime(state.lastRecordingStartedAtEpochMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                    )
+                    Text(
+                        "Last trip recording stopped: ${formatHomeEventTime(state.lastRecordingStoppedAtEpochMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                     )
                 }
             }
+
+            val sensorState = state.sensorRecording
 
             // --- Technical details (collapsed) ---
             Card(
@@ -381,6 +424,51 @@ fun HomeScreen(
                     AnimatedVisibility(visible = technicalDetailsExpanded) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Spacer(modifier = Modifier.height(8.dp))
+                            StatusSummaryLine(
+                                label = "Listening for trips",
+                                ok = passivePipelineListening,
+                                okDetail = "Activity recognition updates are active.",
+                                badDetail = "Trip detection may not start until listening resumes.",
+                            )
+                            SummaryLine(
+                                label = "In vehicle (estimate)",
+                                value =
+                                    when {
+                                        collector.likelyInVehicle -> "Likely yes"
+                                        collector.activityRecognitionUpdatesActive -> "Likely no"
+                                        else -> "Unknown"
+                                    },
+                            )
+                            StatusSummaryLine(
+                                label = "Recording service (foreground)",
+                                ok = collector.foregroundServiceRunning,
+                                okDetail = "Service is running (expect a persistent notification while recording).",
+                                badDetail = "Not running — typical when idle; during a trip it should be active.",
+                            )
+                            SummaryLine(
+                                label = "Trips saved / upload",
+                                value = "${state.recordingSessionCount} · " +
+                                    if (state.uploadWifiOnly) "Wi-Fi only" else "Wi-Fi preferred",
+                            )
+                            SummaryLine(
+                                label = "GPS samples (while recording)",
+                                value = state.locationRecording.publishedSampleCount.toString(),
+                            )
+                            SummaryLine(
+                                label = "Motion sampling",
+                                value =
+                                    when {
+                                        !sensorState.recordingSensors -> "Idle"
+                                        sensorState.degradedRecording -> "Active (reduced)"
+                                        else -> "Active"
+                                    },
+                            )
+                            Text(
+                                state.pendingUploadSummaryPlaceholder,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                             Text(
                                 "Effective (onboarding and toggle): ${state.passiveCollectionEffective}",
                                 style = MaterialTheme.typography.bodySmall,
@@ -510,7 +598,7 @@ fun HomeScreen(
                             onClick = { viewModel.debugForceStartRecording() },
                             enabled =
                                 collector.lifecycleState != CollectorLifecycleState.RECORDING &&
-                                    collector.lifecycleState != CollectorLifecycleState.COOLDOWN,
+                                    collector.lifecycleState != CollectorLifecycleState.STOP_HOLD,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text("Force start recording")
@@ -536,10 +624,143 @@ fun HomeScreen(
                 FilledTonalButton(onClick = onOpenSessions, modifier = Modifier.fillMaxWidth()) {
                     Text("Recorded sessions")
                 }
+                OutlinedButton(onClick = onOpenAllRunsReview, modifier = Modifier.fillMaxWidth()) {
+                    Text("All runs review (experimental)")
+                }
             }
         }
     }
 }
+
+private enum class HomeReadinessKind {
+    Ok,
+    NeedsWork,
+    InProgress,
+}
+
+@Composable
+private fun HomeReadinessRow(
+    title: String,
+    subtitle: String,
+    kind: HomeReadinessKind,
+) {
+    val (icon, tint) =
+        when (kind) {
+            HomeReadinessKind.Ok ->
+                Icons.Rounded.CheckCircle to MaterialTheme.colorScheme.tertiary
+            HomeReadinessKind.NeedsWork ->
+                Icons.Rounded.Cancel to MaterialTheme.colorScheme.error
+            HomeReadinessKind.InProgress ->
+                Icons.Rounded.Schedule to MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.65f)
+        }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(26.dp),
+            tint = tint,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.88f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusSummaryLine(
+    label: String,
+    ok: Boolean,
+    okDetail: String,
+    badDetail: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            imageVector = if (ok) Icons.Rounded.CheckCircle else Icons.Rounded.Cancel,
+            contentDescription = if (ok) "Ready" else "Needs attention",
+            modifier =
+                Modifier
+                    .padding(top = 2.dp)
+                    .size(22.dp),
+            tint =
+                if (ok) {
+                    MaterialTheme.colorScheme.tertiary
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = if (ok) okDetail else badDetail,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+    }
+}
+
+private fun latestTripProcessingReadiness(
+    latest: SessionListStats,
+): Triple<HomeReadinessKind, String, String> =
+    when (latest.processingState) {
+        SessionProcessingState.COMPLETED -> {
+            val extra =
+                buildString {
+                    append("${latest.derivedWindowCount} roughness windows")
+                    if (latest.anomalyCount > 0L) {
+                        append(" · ${latest.anomalyCount} anomalies flagged")
+                    }
+                }
+            Triple(
+                HomeReadinessKind.Ok,
+                "Latest trip — analysis complete (trip #${latest.id})",
+                extra,
+            )
+        }
+        SessionProcessingState.NOT_STARTED, SessionProcessingState.QUEUED -> {
+            Triple(
+                HomeReadinessKind.NeedsWork,
+                "Latest trip — roughness not ready yet (trip #${latest.id})",
+                "Open Recorded sessions once so on-device analysis can run, or wait after your next drive.",
+            )
+        }
+        SessionProcessingState.RUNNING -> {
+            Triple(
+                HomeReadinessKind.InProgress,
+                "Latest trip — analyzing… (trip #${latest.id})",
+                "Roughness windows are being built on device.",
+            )
+        }
+        SessionProcessingState.FAILED -> {
+            val err = (latest.processingLastError ?: "Unknown error").take(96)
+            Triple(
+                HomeReadinessKind.NeedsWork,
+                "Latest trip — analysis failed (trip #${latest.id})",
+                err,
+            )
+        }
+    }
 
 @Composable
 private fun HomeSectionTitle(text: String) {
@@ -550,46 +771,6 @@ private fun HomeSectionTitle(text: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 4.dp, top = 4.dp),
     )
-}
-
-@Composable
-private fun StatusLabeledChip(
-    label: String,
-    value: String,
-    positive: Boolean,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color =
-                if (positive) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                },
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                color =
-                    if (positive) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            )
-        }
-    }
 }
 
 @Composable
@@ -677,7 +858,22 @@ private fun collectorStateDisplay(state: CollectorLifecycleState): String =
         CollectorLifecycleState.IDLE -> "Idle"
         CollectorLifecycleState.ARMING -> "Arming"
         CollectorLifecycleState.RECORDING -> "Recording"
-        CollectorLifecycleState.COOLDOWN -> "Cooldown"
+        CollectorLifecycleState.STOP_HOLD -> "Holding at stop"
         CollectorLifecycleState.PAUSED_POLICY -> "Waiting for permission"
         CollectorLifecycleState.DEGRADED -> "Unavailable"
     }
+
+private fun tripCaptureHeadline(state: CollectorLifecycleState): String =
+    when (state) {
+        CollectorLifecycleState.RECORDING -> "Recording now"
+        CollectorLifecycleState.STOP_HOLD -> "Holding session open at stop (intersection / pause)"
+        CollectorLifecycleState.ARMING -> "Arming — waiting to confirm driving"
+        CollectorLifecycleState.IDLE -> "Not recording — listening for trips when setup is complete"
+        CollectorLifecycleState.PAUSED_POLICY -> "Paused — activity recognition permission needed"
+        CollectorLifecycleState.DEGRADED -> "Trip detection unavailable on this device"
+    }
+
+private fun formatHomeEventTime(epochMs: Long?): String {
+    if (epochMs == null) return "—"
+    return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM).format(epochMs)
+}

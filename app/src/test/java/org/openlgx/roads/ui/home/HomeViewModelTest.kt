@@ -14,8 +14,9 @@ import org.openlgx.roads.FakePassiveCollectionHandle
 import org.openlgx.roads.MainDispatcherRule
 import org.openlgx.roads.collector.PassiveCollectionUiModel
 import org.openlgx.roads.collector.lifecycle.CollectorLifecycleState
-import org.openlgx.roads.data.local.settings.AppSettings
+import org.openlgx.roads.data.local.settings.testAppSettings
 import org.openlgx.roads.data.repo.FakeRecordingSessionRepositoryFlow
+import org.openlgx.roads.data.repo.session.FakeSessionInspectionRepository
 import org.openlgx.roads.location.LocationRecordingController
 import org.openlgx.roads.location.LocationRecordingUiState
 import org.openlgx.roads.sensor.SensorAvailabilitySnapshot
@@ -50,21 +51,9 @@ class HomeViewModelTest {
         runTest {
             val repo =
                 FakeAppSettingsRepository(
-                    AppSettings(
+                    testAppSettings(
                         onboardingCompleted = false,
-                        passiveCollectionUserEnabled = true,
                         passiveCollectionEffective = false,
-                        uploadWifiOnly = true,
-                        uploadAllowCellular = false,
-                        uploadOnlyWhileCharging = false,
-                        uploadPauseOnLowBatteryEnabled = true,
-                        uploadLowBatteryThresholdPercent = 20,
-                        retentionDays = 30,
-                        maxLocalStorageMb = 0,
-                        localCompactionEnabled = false,
-                        captureMinSpeedMps = 4.5f,
-                        debugModeEnabled = false,
-                        calibrationWorkflowEnabled = false,
                     ),
                 )
 
@@ -72,29 +61,13 @@ class HomeViewModelTest {
             val location = FakeLocationRecordingHome()
             val sensor = FakeSensorRecordingHome()
             val sessions = FakeRecordingSessionRepositoryFlow()
-            val vm = HomeViewModel(repo, collector, location, sensor, sessions)
+            val inspect = FakeSessionInspectionRepository()
+            val vm = HomeViewModel(repo, collector, location, sensor, sessions, inspect)
             advanceUntilIdle()
 
             assertFalse(vm.uiState.value.passiveCollectionEffective)
 
-            repo.overrideSettings(
-                AppSettings(
-                    onboardingCompleted = true,
-                    passiveCollectionUserEnabled = true,
-                    passiveCollectionEffective = true,
-                    uploadWifiOnly = true,
-                    uploadAllowCellular = false,
-                    uploadOnlyWhileCharging = false,
-                    uploadPauseOnLowBatteryEnabled = true,
-                    uploadLowBatteryThresholdPercent = 20,
-                    retentionDays = 30,
-                    maxLocalStorageMb = 0,
-                    localCompactionEnabled = false,
-                    captureMinSpeedMps = 4.5f,
-                    debugModeEnabled = false,
-                    calibrationWorkflowEnabled = false,
-                ),
-            )
+            repo.overrideSettings(testAppSettings())
             advanceUntilIdle()
 
             assertTrue(vm.uiState.value.passiveCollectionEffective)
@@ -106,22 +79,7 @@ class HomeViewModelTest {
         runTest {
             val repo =
                 FakeAppSettingsRepository(
-                    AppSettings(
-                        onboardingCompleted = true,
-                        passiveCollectionUserEnabled = true,
-                        passiveCollectionEffective = true,
-                        uploadWifiOnly = true,
-                        uploadAllowCellular = false,
-                        uploadOnlyWhileCharging = false,
-                        uploadPauseOnLowBatteryEnabled = true,
-                        uploadLowBatteryThresholdPercent = 20,
-                        retentionDays = 30,
-                        maxLocalStorageMb = 0,
-                        localCompactionEnabled = false,
-                        captureMinSpeedMps = 4.5f,
-                        debugModeEnabled = false,
-                        calibrationWorkflowEnabled = false,
-                    ),
+                    testAppSettings(),
                 )
 
             val collector =
@@ -139,7 +97,8 @@ class HomeViewModelTest {
             val location = FakeLocationRecordingHome()
             val sensor = FakeSensorRecordingHome()
             val sessions = FakeRecordingSessionRepositoryFlow()
-            val vm = HomeViewModel(repo, collector, location, sensor, sessions)
+            val inspect = FakeSessionInspectionRepository()
+            val vm = HomeViewModel(repo, collector, location, sensor, sessions, inspect)
             advanceUntilIdle()
 
             assertEquals(CollectorLifecycleState.ARMING, vm.uiState.value.collector.lifecycleState)
@@ -151,22 +110,7 @@ class HomeViewModelTest {
         runTest {
             val repo =
                 FakeAppSettingsRepository(
-                    AppSettings(
-                        onboardingCompleted = true,
-                        passiveCollectionUserEnabled = true,
-                        passiveCollectionEffective = true,
-                        uploadWifiOnly = true,
-                        uploadAllowCellular = false,
-                        uploadOnlyWhileCharging = false,
-                        uploadPauseOnLowBatteryEnabled = true,
-                        uploadLowBatteryThresholdPercent = 20,
-                        retentionDays = 30,
-                        maxLocalStorageMb = 0,
-                        localCompactionEnabled = false,
-                        captureMinSpeedMps = 4.5f,
-                        debugModeEnabled = false,
-                        calibrationWorkflowEnabled = false,
-                    ),
+                    testAppSettings(),
                 )
             val collector = FakePassiveCollectionHandle()
             val location =
@@ -209,7 +153,8 @@ class HomeViewModelTest {
                     ),
                 )
             val sessions = FakeRecordingSessionRepositoryFlow(initialSessionCount = 11L)
-            val vm = HomeViewModel(repo, collector, location, sensor, sessions)
+            val inspect = FakeSessionInspectionRepository()
+            val vm = HomeViewModel(repo, collector, location, sensor, sessions, inspect)
             advanceUntilIdle()
 
             assertEquals(11L, vm.uiState.value.recordingSessionCount)

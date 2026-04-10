@@ -45,4 +45,10 @@ interface LocationSampleDao {
         limit: Int,
         offset: Int,
     ): List<LocationSampleEntity>
+
+    @Query(
+        "SELECT * FROM location_samples WHERE sessionId = :sessionId " +
+            "ORDER BY wallClockUtcEpochMs ASC",
+    )
+    suspend fun listAllForSessionOrdered(sessionId: Long): List<LocationSampleEntity>
 }

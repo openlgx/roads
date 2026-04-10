@@ -90,7 +90,12 @@ fun DiagnosticsScreen(
                     Text("Retention days (placeholder): ${snap.settings.retentionDays}")
                     Text("Max local storage MB (0 = unset): ${snap.settings.maxLocalStorageMb}")
                     Text("Local compaction enabled (placeholder): ${snap.settings.localCompactionEnabled}")
-                    Text("Capture min speed (m/s, placeholder): ${snap.settings.captureMinSpeedMps}")
+                    Text("Capture start speed (m/s): ${snap.settings.captureStartSpeedMps}")
+                    Text("Capture immediate start speed (m/s): ${snap.settings.captureImmediateStartSpeedMps}")
+                    Text("Capture stop speed (m/s): ${snap.settings.captureStopSpeedMps}")
+                    Text("Stop hold (s): ${snap.settings.captureStopHoldSeconds}")
+                    Text("Fast arming: ${snap.settings.captureFastArmingEnabled}")
+                    Text("Processing window (s): ${snap.settings.processingWindowSeconds}")
                     Text("Debug mode: ${snap.settings.debugModeEnabled}")
 
                     Text("Database row counts", style = MaterialTheme.typography.titleMedium)

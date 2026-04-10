@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import org.openlgx.roads.data.local.db.RoadsDatabase
+import org.openlgx.roads.data.local.db.RoadsDatabaseMigrations
 import javax.inject.Singleton
 
 @Module
@@ -20,6 +21,6 @@ object DatabaseModule {
         @ApplicationContext context: Context,
     ): RoadsDatabase =
         Room.databaseBuilder(context, RoadsDatabase::class.java, "roads.db")
-            .fallbackToDestructiveMigration()
+            .addMigrations(RoadsDatabaseMigrations.MIGRATION_3_4)
             .build()
 }

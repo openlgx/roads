@@ -4,12 +4,17 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import org.openlgx.roads.data.local.db.model.RecordingSource
+import org.openlgx.roads.data.local.db.model.SessionProcessingState
 import org.openlgx.roads.data.local.db.model.SessionState
 import org.openlgx.roads.data.local.db.model.SessionUploadState
 
 @Entity(
     tableName = "recording_sessions",
-    indices = [Index("uuid"), Index("startedAtEpochMs")],
+    indices = [
+        Index("uuid"),
+        Index("startedAtEpochMs"),
+        Index(value = ["state", "startedAtEpochMs"]),
+    ],
 )
 data class RecordingSessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -43,4 +48,10 @@ data class RecordingSessionEntity(
     val roughnessMethodVersion: String? = null,
     val roadResponseScore: Double? = null,
     val roadResponseMethodVersion: String? = null,
+    val processingState: SessionProcessingState = SessionProcessingState.NOT_STARTED,
+    val processingStartedAtEpochMs: Long? = null,
+    val processingCompletedAtEpochMs: Long? = null,
+    val processingLastError: String? = null,
+    /** Rich aggregates JSON; workflow uses [processingState] columns first. */
+    val processingSummaryJson: String? = null,
 )

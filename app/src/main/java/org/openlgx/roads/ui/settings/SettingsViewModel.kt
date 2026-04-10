@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.local.settings.AppSettingsRepository
+import org.openlgx.roads.data.local.settings.CaptureSettingsPreset
 import javax.inject.Inject
 
 @HiltViewModel
@@ -35,9 +36,20 @@ constructor(
                     retentionDays = 30,
                     maxLocalStorageMb = 0,
                     localCompactionEnabled = false,
-                    captureMinSpeedMps = 4.5f,
+                    captureStartSpeedMps = 2.8f,
+                    captureImmediateStartSpeedMps = 4.5f,
+                    captureStopSpeedMps = 1.0f,
+                    captureStopHoldSeconds = 180,
+                    captureStationaryRadiusMeters = 25f,
+                    captureFastArmingEnabled = true,
+                    processingWindowSeconds = 1.0f,
+                    processingDistanceBinMeters = 10f,
+                    processingLiveAfterSessionEnabled = true,
+                    processingAllRunsOverlayEnabled = true,
                     debugModeEnabled = false,
                     calibrationWorkflowEnabled = false,
+                    lastRecordingStartedAtEpochMs = null,
+                    lastRecordingStoppedAtEpochMs = null,
                 ),
         )
 
@@ -81,8 +93,36 @@ constructor(
         viewModelScope.launch { appSettingsRepository.setLocalCompactionEnabled(enabled) }
     }
 
-    fun setCaptureMinSpeedMps(mps: Float) {
-        viewModelScope.launch { appSettingsRepository.setCaptureMinSpeedMps(mps) }
+    fun setCaptureStartSpeedMps(mps: Float) {
+        viewModelScope.launch { appSettingsRepository.setCaptureStartSpeedMps(mps) }
+    }
+
+    fun applyCapturePreset(preset: CaptureSettingsPreset) {
+        viewModelScope.launch { appSettingsRepository.applyCapturePreset(preset) }
+    }
+
+    fun setCaptureFastArmingEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setCaptureFastArmingEnabled(enabled) }
+    }
+
+    fun setCaptureStopHoldSeconds(seconds: Int) {
+        viewModelScope.launch { appSettingsRepository.setCaptureStopHoldSeconds(seconds) }
+    }
+
+    fun setProcessingWindowSeconds(seconds: Float) {
+        viewModelScope.launch { appSettingsRepository.setProcessingWindowSeconds(seconds) }
+    }
+
+    fun setProcessingDistanceBinMeters(meters: Float) {
+        viewModelScope.launch { appSettingsRepository.setProcessingDistanceBinMeters(meters) }
+    }
+
+    fun setProcessingLiveAfterSessionEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setProcessingLiveAfterSessionEnabled(enabled) }
+    }
+
+    fun setProcessingAllRunsOverlayEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setProcessingAllRunsOverlayEnabled(enabled) }
     }
 
     fun setDebugMode(enabled: Boolean) {

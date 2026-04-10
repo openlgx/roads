@@ -8,7 +8,8 @@ enum class CollectorLifecycleState {
     IDLE,
     ARMING,
     RECORDING,
-    COOLDOWN,
+    /** Holding session open at stop / intersection; still writing samples. */
+    STOP_HOLD,
     PAUSED_POLICY,
     DEGRADED,
 }

@@ -16,7 +16,10 @@ import org.openlgx.roads.data.local.db.model.AnomalyType
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("sessionId")],
+    indices = [
+        Index("sessionId"),
+        Index(value = ["sessionId", "wallClockUtcEpochMs"]),
+    ],
 )
 data class AnomalyCandidateEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -28,4 +31,11 @@ data class AnomalyCandidateEntity(
     val methodVersion: String? = null,
     val qualityFlags: Int = 0,
     val detailsJson: String? = null,
+    val wallClockUtcEpochMs: Long? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val speedMps: Double? = null,
+    val headingDeg: Double? = null,
+    val severityBucket: String? = null,
+    val derivedWindowId: Long? = null,
 )

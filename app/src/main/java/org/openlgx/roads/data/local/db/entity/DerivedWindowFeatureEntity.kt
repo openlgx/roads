@@ -16,7 +16,10 @@ import org.openlgx.roads.data.local.db.model.RoadEligibilityDisposition
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("sessionId")],
+    indices = [
+        Index("sessionId"),
+        Index(value = ["sessionId", "windowIndex"]),
+    ],
 )
 data class DerivedWindowFeatureEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -32,4 +35,15 @@ data class DerivedWindowFeatureEntity(
     val roadEligibilityDisposition: RoadEligibilityDisposition = RoadEligibilityDisposition.UNKNOWN,
     val eligibilityConfidence: Float? = null,
     val featureBundleJson: String? = null,
+    val windowStartWallClockUtcEpochMs: Long? = null,
+    val windowEndWallClockUtcEpochMs: Long? = null,
+    val midLatitude: Double? = null,
+    val midLongitude: Double? = null,
+    val meanSpeedMps: Double? = null,
+    val headingMeanDeg: Double? = null,
+    val predPrimaryLabel: String? = null,
+    val scoreCornering: Double? = null,
+    val scoreVerticalShock: Double? = null,
+    val scoreStableCruise: Double? = null,
+    val windowIndex: Int? = null,
 )

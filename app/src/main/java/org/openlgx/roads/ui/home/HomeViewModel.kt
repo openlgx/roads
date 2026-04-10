@@ -11,12 +11,23 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import org.openlgx.roads.collector.PassiveCollectionHandle
 import org.openlgx.roads.collector.PassiveCollectionUiModel
+import org.openlgx.roads.data.local.db.model.SessionListStats
+import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.data.repo.RecordingSessionRepository
+import org.openlgx.roads.data.repo.session.SessionInspectionRepository
 import org.openlgx.roads.location.LocationRecordingController
 import org.openlgx.roads.location.LocationRecordingUiState
 import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.sensor.SensorRecordingUiState
+
+private data class HomePartialState(
+    val settings: AppSettings,
+    val collector: PassiveCollectionUiModel,
+    val location: LocationRecordingUiState,
+    val sensor: SensorRecordingUiState,
+    val sessionCount: Long,
+)
 
 data class HomeUiState(
     val passiveCollectionEffective: Boolean = false,
@@ -30,6 +41,10 @@ data class HomeUiState(
     val locationRecording: LocationRecordingUiState = LocationRecordingUiState(),
     val sensorRecording: SensorRecordingUiState = SensorRecordingUiState(),
     val recordingSessionCount: Long = 0L,
+    /** Most recent session row (by start time), for Home processing summary. */
+    val latestSessionSummary: SessionListStats? = null,
+    val lastRecordingStartedAtEpochMs: Long? = null,
+    val lastRecordingStoppedAtEpochMs: Long? = null,
 )
 
 @HiltViewModel
@@ -41,16 +56,23 @@ constructor(
     locationRecordingController: LocationRecordingController,
     sensorRecordingController: SensorRecordingController,
     recordingSessionRepository: RecordingSessionRepository,
+    sessionInspectionRepository: SessionInspectionRepository,
 ) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> =
         combine(
-            appSettingsRepository.settings,
-            passiveCollection.uiState,
-            locationRecordingController.uiState,
-            sensorRecordingController.uiState,
-            recordingSessionRepository.observeRecordingSessionCount(),
-        ) { settings, collector, location, sensor, sessionCount ->
+            combine(
+                appSettingsRepository.settings,
+                passiveCollection.uiState,
+                locationRecordingController.uiState,
+                sensorRecordingController.uiState,
+                recordingSessionRepository.observeRecordingSessionCount(),
+            ) { settings, collector, location, sensor, sessionCount ->
+                HomePartialState(settings, collector, location, sensor, sessionCount)
+            },
+            sessionInspectionRepository.observeSessionList(),
+        ) { partial, sessionRows ->
+            val settings = partial.settings
             HomeUiState(
                 passiveCollectionEffective = settings.passiveCollectionEffective,
                 passiveCollectionUserEnabled = settings.passiveCollectionUserEnabled,
@@ -59,10 +81,13 @@ constructor(
                 uploadAllowCellular = settings.uploadAllowCellular,
                 debugModeEnabled = settings.debugModeEnabled,
                 pendingUploadSummaryPlaceholder = "See Diagnostics for queue (Phase 1)",
-                collector = collector,
-                locationRecording = location,
-                sensorRecording = sensor,
-                recordingSessionCount = sessionCount,
+                collector = partial.collector,
+                locationRecording = partial.location,
+                sensorRecording = partial.sensor,
+                recordingSessionCount = partial.sessionCount,
+                latestSessionSummary = sessionRows.firstOrNull(),
+                lastRecordingStartedAtEpochMs = settings.lastRecordingStartedAtEpochMs,
+                lastRecordingStoppedAtEpochMs = settings.lastRecordingStoppedAtEpochMs,
             )
         }.stateIn(
             scope = viewModelScope,

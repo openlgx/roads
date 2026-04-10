@@ -5,33 +5,38 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import org.json.JSONObject
 import org.openlgx.roads.activityrecognition.ActivityRecognitionGateway
 import org.openlgx.roads.activityrecognition.ActivityRecognitionLabels
 import org.openlgx.roads.activityrecognition.ActivityRecognitionSnapshot
 import org.openlgx.roads.collector.lifecycle.CollectorLifecycleState
-import org.openlgx.roads.data.local.settings.AppSettings
-import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.data.local.db.model.RecordingSource
 import org.openlgx.roads.data.local.db.model.SessionState
+import org.openlgx.roads.data.local.settings.AppSettings
+import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.data.repo.AutoRecordingSessionStartParams
 import org.openlgx.roads.data.repo.RecordingSessionRepository
 import org.openlgx.roads.di.ApplicationScope
 import org.openlgx.roads.location.ArmingDrivingGate
 import org.openlgx.roads.location.LocationRecordingController
-import org.openlgx.roads.sensor.SensorRecordingController
+import org.openlgx.roads.location.LocationRecordingUiState
 import org.openlgx.roads.permission.ActivityRecognitionPermissionChecker
 import org.openlgx.roads.permission.FineLocationPermissionChecker
 import org.openlgx.roads.processing.calibration.SessionCalibrationHook
+import org.openlgx.roads.processing.ondevice.SessionProcessingScheduler
+import org.openlgx.roads.sensor.SensorRecordingController
+import org.openlgx.roads.service.CollectorForegroundPresentation
+import org.openlgx.roads.service.CollectorForegroundPresentationRegistry
 import org.openlgx.roads.service.CollectorForegroundServiceController
 import org.openlgx.roads.service.CollectorServiceStateRegistry
+import org.openlgx.roads.service.RecordingEventNotifier
 import timber.log.Timber
 
 @Singleton
@@ -49,6 +54,9 @@ constructor(
     private val sensorRecordingController: SensorRecordingController,
     private val serviceStateRegistry: CollectorServiceStateRegistry,
     private val sessionCalibrationHook: SessionCalibrationHook,
+    private val sessionProcessingScheduler: SessionProcessingScheduler,
+    private val foregroundPresentationRegistry: CollectorForegroundPresentationRegistry,
+    private val recordingEventNotifier: RecordingEventNotifier,
     @ApplicationScope private val applicationScope: CoroutineScope,
 ) : PassiveCollectionHandle {
     private val mailbox = Channel<Unit>(capacity = Channel.CONFLATED)
@@ -57,8 +65,11 @@ constructor(
     private var armingStartedAtEpochMs: Long? = null
     private var activeSessionId: Long? = null
     private var armingJob: Job? = null
-    private var cooldownJob: Job? = null
+    private var stopHoldTimeoutJob: Job? = null
     private var debugDrivingOverride: Boolean? = null
+
+    /** Streak tracking for entering [CollectorLifecycleState.STOP_HOLD]. */
+    private var lowMovementSinceEpochMs: Long? = null
 
     @Volatile private var pendingDebugForceRecording: Boolean = false
 
@@ -101,6 +112,12 @@ constructor(
             serviceStateRegistry.foregroundRunning.collectLatest { mailbox.trySend(Unit) }
         }
 
+        applicationScope.launch {
+            locationRecordingController.uiState.collectLatest {
+                mailbox.trySend(Unit)
+            }
+        }
+
         mailbox.trySend(Unit)
     }
 
@@ -141,7 +158,7 @@ constructor(
             val settings = lastSettings ?: return
             if (!settings.debugModeEnabled) return
             if (lifecycleState == CollectorLifecycleState.RECORDING ||
-                lifecycleState == CollectorLifecycleState.COOLDOWN
+                lifecycleState == CollectorLifecycleState.STOP_HOLD
             ) {
                 return
             }
@@ -167,7 +184,7 @@ constructor(
         if (!passive) {
             cancelDeferredJobs()
             if (lifecycleState == CollectorLifecycleState.RECORDING ||
-                lifecycleState == CollectorLifecycleState.COOLDOWN
+                lifecycleState == CollectorLifecycleState.STOP_HOLD
             ) {
                 endActiveSessionIfNeeded(settings, SessionState.INTERRUPTED)
             }
@@ -182,7 +199,7 @@ constructor(
         if (!arOk) {
             cancelDeferredJobs()
             if (lifecycleState == CollectorLifecycleState.RECORDING ||
-                lifecycleState == CollectorLifecycleState.COOLDOWN
+                lifecycleState == CollectorLifecycleState.STOP_HOLD
             ) {
                 endActiveSessionIfNeeded(settings, SessionState.INTERRUPTED)
             }
@@ -197,7 +214,7 @@ constructor(
         if (!perm) {
             cancelDeferredJobs()
             if (lifecycleState == CollectorLifecycleState.RECORDING ||
-                lifecycleState == CollectorLifecycleState.COOLDOWN
+                lifecycleState == CollectorLifecycleState.STOP_HOLD
             ) {
                 endActiveSessionIfNeeded(settings, SessionState.ABORTED_POLICY)
             }
@@ -223,10 +240,12 @@ constructor(
                     updatesActive && snapAfter.likelyInVehicle && passive && perm && arOk
             }
 
+        val loc = locationRecordingController.uiState.value
+
         when (lifecycleState) {
             CollectorLifecycleState.IDLE -> {
                 if (likelyDriving) {
-                    startArmingWindow()
+                    startArmingWindow(settings, snapAfter)
                 }
             }
 
@@ -238,15 +257,23 @@ constructor(
             }
 
             CollectorLifecycleState.RECORDING -> {
-                if (!likelyDriving) {
-                    startCooldownWindow()
+                if (movementConfident(settings, loc)) {
+                    lowMovementSinceEpochMs = null
+                } else {
+                    val now = System.currentTimeMillis()
+                    val start = lowMovementSinceEpochMs ?: now
+                    lowMovementSinceEpochMs = start
+                    if (now - start >= LOW_MOVEMENT_ENTER_STOP_HOLD_MS) {
+                        enterStopHold(settings)
+                    }
                 }
             }
 
-            CollectorLifecycleState.COOLDOWN -> {
-                if (likelyDriving) {
-                    cancelDeferredJobs()
+            CollectorLifecycleState.STOP_HOLD -> {
+                if (movementResumedFromHold(settings, loc)) {
+                    cancelStopHoldTimeout()
                     lifecycleState = CollectorLifecycleState.RECORDING
+                    lowMovementSinceEpochMs = null
                     val sid = activeSessionId
                     if (sid != null) {
                         foregroundServiceController.startCollectorService(sid)
@@ -262,14 +289,81 @@ constructor(
         publishUi(settings, snapAfter, perm, updatesActive, passive, arOk)
     }
 
-    private fun startArmingWindow() {
+    private fun movementConfident(settings: AppSettings, loc: LocationRecordingUiState): Boolean =
+        when (debugDrivingOverride) {
+            true -> true
+            false -> false
+            null -> movementConfidentWhenNotOverridden(settings, loc)
+        }
+
+    private fun movementConfidentWhenNotOverridden(
+        settings: AppSettings,
+        loc: LocationRecordingUiState,
+    ): Boolean {
+        if (activeSessionId == null) return false
+        if (!loc.recordingLocation || loc.activeSessionId != activeSessionId) return false
+        val sp = loc.lastSpeedMps ?: return false
+        return sp >= settings.captureStopSpeedMps
+    }
+
+    private fun movementResumedFromHold(settings: AppSettings, loc: LocationRecordingUiState): Boolean =
+        when (debugDrivingOverride) {
+            true -> true
+            false -> false
+            null -> movementResumedFromHoldWhenNotOverridden(settings, loc)
+        }
+
+    private fun movementResumedFromHoldWhenNotOverridden(
+        settings: AppSettings,
+        loc: LocationRecordingUiState,
+    ): Boolean {
+        if (activeSessionId == null) return false
+        if (!loc.recordingLocation || loc.activeSessionId != activeSessionId) return false
+        val sp = loc.lastSpeedMps ?: return false
+        return sp >= settings.captureStartSpeedMps
+    }
+
+    private fun enterStopHold(settings: AppSettings) {
+        if (lifecycleState != CollectorLifecycleState.RECORDING) return
+        lifecycleState = CollectorLifecycleState.STOP_HOLD
+        lowMovementSinceEpochMs = null
+        cancelStopHoldTimeout()
+        val holdMs = settings.captureStopHoldSeconds * 1000L
+        stopHoldTimeoutJob =
+            applicationScope.launch {
+                delay(holdMs)
+                finalizeCompletedSession()
+            }
+    }
+
+    private fun cancelStopHoldTimeout() {
+        stopHoldTimeoutJob?.cancel()
+        stopHoldTimeoutJob = null
+    }
+
+    private fun armingDebounceMs(settings: AppSettings, snap: ActivityRecognitionSnapshot): Long {
+        if (debugDrivingOverride == true) return FAST_ARMING_DEBOUNCE_MS
+        val loc = locationRecordingController.uiState.value
+        val vehicle = snap.likelyInVehicle && snap.updatesActive
+        if (settings.captureFastArmingEnabled &&
+            vehicle &&
+            loc.lastSpeedMps != null &&
+            loc.lastSpeedMps >= settings.captureImmediateStartSpeedMps
+        ) {
+            return FAST_ARMING_DEBOUNCE_MS
+        }
+        return NORMAL_ARMING_DEBOUNCE_MS
+    }
+
+    private fun startArmingWindow(settings: AppSettings, snap: ActivityRecognitionSnapshot) {
         if (lifecycleState != CollectorLifecycleState.IDLE) return
         lifecycleState = CollectorLifecycleState.ARMING
         armingStartedAtEpochMs = System.currentTimeMillis()
         armingJob?.cancel()
+        val debounce = armingDebounceMs(settings, snap)
         armingJob =
             applicationScope.launch {
-                delay(ARMING_DEBOUNCE_MS)
+                delay(debounce)
                 onArmingWindowComplete()
             }
     }
@@ -297,7 +391,7 @@ constructor(
         val gateOk =
             when (debugDrivingOverride) {
                 true -> true
-                else -> armingDrivingGate.passesLikelyDrivingGate(settings.captureMinSpeedMps)
+                else -> armingDrivingGate.passesLikelyDrivingGate(settings.captureStartSpeedMps)
             }
         if (!gateOk) {
             lifecycleState = CollectorLifecycleState.IDLE
@@ -329,14 +423,17 @@ constructor(
         val id = recordingSessionRepository.beginAutoRecordingSession(params)
         activeSessionId = id
         lifecycleState = CollectorLifecycleState.RECORDING
+        lowMovementSinceEpochMs = null
         armingStartedAtEpochMs = null
         foregroundServiceController.startCollectorService(id)
+        recordingEventNotifier.notifyRecordingStarted(id)
+        appSettingsRepository.recordRecordingStartedAt(now)
         publishUi(settings, snap, permissionChecker.isGranted(), snap.updatesActive, true, true)
     }
 
     private suspend fun enterRecordingBypassArming(settings: AppSettings) {
         if (lifecycleState == CollectorLifecycleState.RECORDING ||
-            lifecycleState == CollectorLifecycleState.COOLDOWN
+            lifecycleState == CollectorLifecycleState.STOP_HOLD
         ) {
             return
         }
@@ -366,30 +463,23 @@ constructor(
         val id = recordingSessionRepository.beginAutoRecordingSession(params)
         activeSessionId = id
         lifecycleState = CollectorLifecycleState.RECORDING
+        lowMovementSinceEpochMs = null
         foregroundServiceController.startCollectorService(id)
+        recordingEventNotifier.notifyRecordingStarted(id)
+        appSettingsRepository.recordRecordingStartedAt(now)
         publishUi()
     }
 
-    private fun startCooldownWindow() {
-        if (lifecycleState != CollectorLifecycleState.RECORDING) return
-        lifecycleState = CollectorLifecycleState.COOLDOWN
-        cooldownJob?.cancel()
-        cooldownJob =
-            applicationScope.launch {
-                delay(COOLDOWN_MS)
-                onCooldownComplete()
-            }
-    }
-
-    private suspend fun onCooldownComplete() {
-        if (lifecycleState != CollectorLifecycleState.COOLDOWN) return
+    private suspend fun finalizeCompletedSession() {
+        if (lifecycleState != CollectorLifecycleState.STOP_HOLD) return
         if (lastSettings == null) return
         val sid = activeSessionId
         locationRecordingController.stopAndFlush()
         sensorRecordingController.stopAndFlush()
         activeSessionId = null
         lifecycleState = CollectorLifecycleState.IDLE
-        cooldownJob = null
+        cancelStopHoldTimeout()
+        lowMovementSinceEpochMs = null
         if (sid != null) {
             val endedAt = System.currentTimeMillis()
             recordingSessionRepository.endRecordingSession(
@@ -403,23 +493,32 @@ constructor(
                 endedAtEpochMs = endedAt,
                 calibrationWorkflowEnabled = lastSettings!!.calibrationWorkflowEnabled,
             )
+            if (lastSettings!!.processingLiveAfterSessionEnabled) {
+                sessionProcessingScheduler.onSessionRecordingCompleted(sid)
+            }
+            recordingEventNotifier.notifyRecordingStopped(sid, SessionState.COMPLETED.name)
+            appSettingsRepository.recordRecordingStoppedAt(endedAt)
         }
         foregroundServiceController.stopCollectorService()
         publishUi()
     }
 
     private suspend fun endActiveSessionIfNeeded(
-        @Suppress("UNUSED_PARAMETER") settings: AppSettings,
+        settings: AppSettings,
         endState: SessionState,
     ) {
         val sid = activeSessionId
         locationRecordingController.stopAndFlush()
         sensorRecordingController.stopAndFlush()
+        cancelStopHoldTimeout()
+        lowMovementSinceEpochMs = null
         if (sid == null) {
             foregroundServiceController.stopCollectorService()
+            lifecycleState = CollectorLifecycleState.IDLE
             return
         }
         activeSessionId = null
+        lifecycleState = CollectorLifecycleState.IDLE
         val endedAt = System.currentTimeMillis()
         recordingSessionRepository.endRecordingSession(
             sessionId = sid,
@@ -432,15 +531,17 @@ constructor(
             endedAtEpochMs = endedAt,
             calibrationWorkflowEnabled = settings.calibrationWorkflowEnabled,
         )
+        recordingEventNotifier.notifyRecordingStopped(sid, endState.name)
+        appSettingsRepository.recordRecordingStoppedAt(endedAt)
         foregroundServiceController.stopCollectorService()
     }
 
     private fun cancelDeferredJobs() {
         armingJob?.cancel()
         armingJob = null
-        cooldownJob?.cancel()
-        cooldownJob = null
+        cancelStopHoldTimeout()
         armingStartedAtEpochMs = null
+        lowMovementSinceEpochMs = null
     }
 
     private fun publishUi() {
@@ -480,6 +581,33 @@ constructor(
                 null -> updatesActive && snap.likelyInVehicle && passive && perm && arOk
             }
         val label = ActivityRecognitionLabels.forType(snap.lastDetectedActivityType)
+        val sid = activeSessionId
+        val pres =
+            when (lifecycleState) {
+                CollectorLifecycleState.RECORDING,
+                CollectorLifecycleState.STOP_HOLD,
+                -> {
+                    if (sid == null) null
+                    else {
+                        CollectorForegroundPresentation(
+                            sessionId = sid,
+                            sessionShortLabel = "#$sid",
+                            lifecycleState = lifecycleState,
+                            degradedOrPolicy = false,
+                        )
+                    }
+                }
+                CollectorLifecycleState.ARMING ->
+                    CollectorForegroundPresentation(
+                        sessionId = 0L,
+                        sessionShortLabel = "arming",
+                        lifecycleState = lifecycleState,
+                        degradedOrPolicy = false,
+                    )
+                else -> null
+            }
+        foregroundPresentationRegistry.publish(pres)
+
         _uiState.value =
             PassiveCollectionUiModel(
                 lifecycleState = lifecycleState,
@@ -492,7 +620,9 @@ constructor(
                 lastActivityType = snap.lastDetectedActivityType,
                 lastActivityConfidence = snap.lastConfidence,
                 lastActivityLabel = label,
-                recordingActive = recording || lifecycleState == CollectorLifecycleState.COOLDOWN,
+                recordingActive =
+                    recording ||
+                        lifecycleState == CollectorLifecycleState.STOP_HOLD,
                 activeSessionId = activeSessionId,
                 foregroundServiceRunning = fg,
                 lastLifecycleTransitionEpochMs = lastLifecycleTransitionEpochMs,
@@ -519,7 +649,8 @@ constructor(
     }
 
     private companion object {
-        const val ARMING_DEBOUNCE_MS: Long = 3_500L
-        const val COOLDOWN_MS: Long = 4_000L
+        const val FAST_ARMING_DEBOUNCE_MS: Long = 500L
+        const val NORMAL_ARMING_DEBOUNCE_MS: Long = 1_600L
+        const val LOW_MOVEMENT_ENTER_STOP_HOLD_MS: Long = 12_000L
     }
 }

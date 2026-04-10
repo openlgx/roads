@@ -26,7 +26,6 @@ import org.openlgx.roads.activityrecognition.ActivityRecognitionGateway
 import org.openlgx.roads.activityrecognition.ActivityRecognitionSnapshot
 import org.openlgx.roads.collector.lifecycle.CollectorLifecycleState
 import org.openlgx.roads.data.local.db.model.SessionState
-import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.repo.AutoRecordingSessionStartParams
 import org.openlgx.roads.data.repo.RecordingSessionRepository
 import org.openlgx.roads.location.ArmingDrivingGate
@@ -37,8 +36,11 @@ import org.openlgx.roads.sensor.SensorRecordingUiState
 import org.openlgx.roads.permission.ActivityRecognitionPermissionChecker
 import org.openlgx.roads.permission.FineLocationPermissionChecker
 import org.openlgx.roads.processing.calibration.SessionCalibrationHook
+import org.openlgx.roads.processing.ondevice.SessionProcessingScheduler
+import org.openlgx.roads.service.CollectorForegroundPresentationRegistry
 import org.openlgx.roads.service.CollectorForegroundServiceController
 import org.openlgx.roads.service.CollectorServiceStateRegistry
+import org.openlgx.roads.service.RecordingEventNotifier
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -80,6 +82,10 @@ class PassiveCollectionCoordinatorTest {
                     sensorRecordingController = FakeSensorRecordingController(),
                     serviceStateRegistry = CollectorServiceStateRegistry(),
                     sessionCalibrationHook = NoOpSessionCalibrationHook,
+                    sessionProcessingScheduler = NoOpSessionProcessingScheduler,
+                    foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
+                    recordingEventNotifier =
+                        RecordingEventNotifier(ApplicationProvider.getApplicationContext()),
                     applicationScope = scope,
                 )
 
@@ -128,6 +134,10 @@ class PassiveCollectionCoordinatorTest {
                     sensorRecordingController = FakeSensorRecordingController(),
                     serviceStateRegistry = CollectorServiceStateRegistry(),
                     sessionCalibrationHook = NoOpSessionCalibrationHook,
+                    sessionProcessingScheduler = NoOpSessionProcessingScheduler,
+                    foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
+                    recordingEventNotifier =
+                        RecordingEventNotifier(ApplicationProvider.getApplicationContext()),
                     applicationScope = scope,
                 )
 
@@ -136,7 +146,7 @@ class PassiveCollectionCoordinatorTest {
 
             assertEquals(CollectorLifecycleState.ARMING, coordinator.uiState.value.lifecycleState)
 
-            advanceTimeBy(4_000L)
+            advanceTimeBy(2_000L)
             runCurrent()
 
             assertEquals(CollectorLifecycleState.RECORDING, coordinator.uiState.value.lifecycleState)
@@ -209,6 +219,14 @@ class PassiveCollectionCoordinatorTest {
         override suspend fun stopAndFlush() = Unit
     }
 
+    private object NoOpSessionProcessingScheduler : SessionProcessingScheduler {
+        override fun onSessionRecordingCompleted(sessionId: Long) = Unit
+
+        override fun requestReprocess(sessionId: Long) = Unit
+
+        override fun requestBackfillPendingProcessing() = Unit
+    }
+
     private object NoOpSessionCalibrationHook : SessionCalibrationHook {
         override suspend fun onRecordingSessionEnded(
             sessionId: Long,
@@ -240,20 +258,5 @@ class PassiveCollectionCoordinatorTest {
     }
 }
 
-private fun effectiveOnboardingPassiveOn(): AppSettings =
-    AppSettings(
-        onboardingCompleted = true,
-        passiveCollectionUserEnabled = true,
-        passiveCollectionEffective = true,
-        uploadWifiOnly = true,
-        uploadAllowCellular = false,
-        uploadOnlyWhileCharging = false,
-        uploadPauseOnLowBatteryEnabled = true,
-        uploadLowBatteryThresholdPercent = 20,
-        retentionDays = 30,
-        maxLocalStorageMb = 0,
-        localCompactionEnabled = false,
-        captureMinSpeedMps = 4.5f,
-        debugModeEnabled = false,
-        calibrationWorkflowEnabled = false,
-    )
+private fun effectiveOnboardingPassiveOn(): org.openlgx.roads.data.local.settings.AppSettings =
+    org.openlgx.roads.data.local.settings.testAppSettings()

@@ -5,6 +5,7 @@ import org.openlgx.roads.data.local.db.model.AnomalyType
 import org.openlgx.roads.data.local.db.model.BatchUploadState
 import org.openlgx.roads.data.local.db.model.RecordingSource
 import org.openlgx.roads.data.local.db.model.RoadEligibilityDisposition
+import org.openlgx.roads.data.local.db.model.SessionProcessingState
 import org.openlgx.roads.data.local.db.model.SessionState
 import org.openlgx.roads.data.local.db.model.SessionUploadState
 
@@ -46,4 +47,11 @@ class Converters {
 
     @TypeConverter
     fun toAnomalyType(value: String): AnomalyType = AnomalyType.valueOf(value)
+
+    @TypeConverter
+    fun fromSessionProcessingState(value: SessionProcessingState): String = value.name
+
+    @TypeConverter
+    fun toSessionProcessingState(value: String): SessionProcessingState =
+        SessionProcessingState.valueOf(value)
 }

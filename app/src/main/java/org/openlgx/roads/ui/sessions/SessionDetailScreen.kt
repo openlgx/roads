@@ -2,6 +2,7 @@ package org.openlgx.roads.ui.sessions
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -24,9 +25,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun SessionDetailScreen(
     viewModel: SessionDetailViewModel,
     onBack: () -> Unit,
+    onOpenReview: () -> Unit,
 ) {
     val detail by viewModel.detail.collectAsStateWithLifecycle()
     val exportMessage by viewModel.exportMessage.collectAsStateWithLifecycle()
+    val reprocessMessage by viewModel.reprocessMessage.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -71,6 +74,18 @@ fun SessionDetailScreen(
             Text("sessionUploadState: ${s.sessionUploadState} (queue placeholder)")
             Text("qualityFlags: ${s.qualityFlags} (placeholder bitmask)")
 
+            Text("On-device processing", style = MaterialTheme.typography.titleMedium)
+            Text("processingState: ${s.processingState}")
+            Text("processingStartedAtEpochMs: ${s.processingStartedAtEpochMs ?: "—"}")
+            Text("processingCompletedAtEpochMs: ${s.processingCompletedAtEpochMs ?: "—"}")
+            Text("processingLastError: ${s.processingLastError ?: "—"}")
+            Text(
+                "processingSummaryJson: ${s.processingSummaryJson ?: "—"}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text("roughnessProxyScore: ${s.roughnessProxyScore ?: "—"} (${s.roughnessMethodVersion ?: "—"})")
+            Text("roadResponseScore: ${s.roadResponseScore ?: "—"} (${s.roadResponseMethodVersion ?: "—"})")
+
             Text("Samples", style = MaterialTheme.typography.titleMedium)
             Text("locationSampleCount: ${d.locationSampleCount}")
             Text("sensorSampleCount: ${d.sensorSampleCount}")
@@ -98,6 +113,16 @@ fun SessionDetailScreen(
             Text("loc gaps: ${v.locationSuspectGaps}, sens gaps: ${v.sensorSuspectGaps}")
             Text("low rate warn: ${v.suspiciouslyLowSampleRate}")
             Text("notes:\n${v.notes.joinToString("\n")}")
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onOpenReview) {
+                    Text("Open trip review")
+                }
+                Button(onClick = viewModel::requestReprocess) {
+                    Text("Reprocess")
+                }
+            }
+            reprocessMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
 
             Button(onClick = viewModel::exportSession) {
                 Text("Export session (folder + zip)")

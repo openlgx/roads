@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import org.openlgx.roads.data.repo.session.SessionDetail
 import org.openlgx.roads.data.repo.session.SessionInspectionRepository
 import org.openlgx.roads.export.SessionExporter
+import org.openlgx.roads.processing.ondevice.SessionProcessingScheduler
 
 @HiltViewModel
 class SessionDetailViewModel
@@ -19,6 +20,7 @@ class SessionDetailViewModel
 constructor(
     private val sessionInspectionRepository: SessionInspectionRepository,
     private val sessionExporter: SessionExporter,
+    private val sessionProcessingScheduler: SessionProcessingScheduler,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -29,6 +31,9 @@ constructor(
 
     private val _exportMessage = MutableStateFlow<String?>(null)
     val exportMessage: StateFlow<String?> = _exportMessage.asStateFlow()
+
+    private val _reprocessMessage = MutableStateFlow<String?>(null)
+    val reprocessMessage: StateFlow<String?> = _reprocessMessage.asStateFlow()
 
     init {
         if (sessionId > 0) {
@@ -58,5 +63,12 @@ constructor(
                     },
                 )
         }
+    }
+
+    fun requestReprocess() {
+        if (sessionId <= 0) return
+        sessionProcessingScheduler.requestReprocess(sessionId)
+        _reprocessMessage.value =
+            "Reprocess requested. If processing is already running, this session will run again when it finishes."
     }
 }
