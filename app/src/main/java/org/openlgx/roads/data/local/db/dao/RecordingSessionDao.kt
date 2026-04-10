@@ -6,6 +6,7 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 import org.openlgx.roads.data.local.db.entity.RecordingSessionEntity
 import org.openlgx.roads.data.local.db.model.SessionListStats
+import org.openlgx.roads.data.local.db.model.SessionHostedPipelineState
 import org.openlgx.roads.data.local.db.model.SessionProcessingState
 import org.openlgx.roads.data.local.db.model.SessionState
 
@@ -133,5 +134,13 @@ interface RecordingSessionDao {
         roughnessMethodVersion: String?,
         roadResponse: Double?,
         roadResponseMethodVersion: String?,
+    )
+
+    @Query(
+        "UPDATE recording_sessions SET hostedPipelineState = :state WHERE id = :sessionId",
+    )
+    suspend fun updateHostedPipelineState(
+        sessionId: Long,
+        state: SessionHostedPipelineState,
     )
 }

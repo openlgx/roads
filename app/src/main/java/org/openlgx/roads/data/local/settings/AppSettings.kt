@@ -46,4 +46,27 @@ data class AppSettings(
     val lastRecordingStartedAtEpochMs: Long?,
     /** DataStore log: last time a “recording stopped” one-shot was emitted (epoch ms). */
     val lastRecordingStoppedAtEpochMs: Long?,
+    // --- Hosted alpha upload (additive; local-first unchanged) ---
+    val uploadEnabled: Boolean,
+    /** Base URL through Supabase Edge path, e.g. `https://xxx.supabase.co/functions/v1`. */
+    val uploadBaseUrl: String,
+    /** Device upload API key (secret — treat like password). */
+    val uploadApiKey: String,
+    val uploadRetryLimit: Int,
+    val uploadAutoAfterSessionEnabled: Boolean,
+    val uploadRoadFilterEnabled: Boolean,
+    val uploadRoadFilterDistanceMeters: Float,
+    val uploadRoadFilterUnknownPolicy: UploadRoadFilterUnknownPolicy,
+    val uploadRoadPackRequiredForAutoUpload: Boolean,
+    val uploadCouncilSlug: String,
+    val uploadProjectSlug: String,
+    /** Neon `projects.id` UUID string for API body. */
+    val uploadProjectId: String,
+    /** Neon `devices.id` UUID string for API body. */
+    val uploadDeviceId: String,
+    /**
+     * Soft preference only: never a hard WorkManager charging gate.
+     * @see uploadOnlyWhileCharging for the hard requirement.
+     */
+    val uploadChargingPreferred: Boolean,
 )

@@ -33,6 +33,8 @@ enum class BatchUploadState {
 enum class RoadEligibilityDisposition {
     UNKNOWN,
     LIKELY_PUBLIC_ROAD,
+    /** Within configured buffer of public-road pack geometry. */
+    NEAR_PUBLIC_ROAD,
     UNLIKELY_OR_OFF_ROAD,
     PRIVATE_OR_CARPARK_HEURISTIC,
 }

@@ -107,4 +107,35 @@ object RoadsDatabaseMigrations {
                 )
             }
         }
+
+    val MIGRATION_4_5: Migration =
+        object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE recording_sessions ADD COLUMN hostedPipelineState TEXT NOT NULL DEFAULT 'NOT_STARTED'",
+                )
+                db.execSQL(
+                    "ALTER TABLE upload_batches ADD COLUMN localRawArtifactUri TEXT",
+                )
+                db.execSQL(
+                    "ALTER TABLE upload_batches ADD COLUMN localFilteredArtifactUri TEXT",
+                )
+                db.execSQL(
+                    "ALTER TABLE upload_batches ADD COLUMN remoteUploadJobId TEXT",
+                )
+                db.execSQL(
+                    "ALTER TABLE upload_batches ADD COLUMN remoteStorageKey TEXT",
+                )
+                db.execSQL(
+                    "ALTER TABLE upload_batches ADD COLUMN roadFilterSummaryJson TEXT",
+                )
+                db.execSQL(
+                    "ALTER TABLE upload_batches ADD COLUMN sourceSessionUuid TEXT",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_recording_sessions_hostedPipelineState` " +
+                        "ON `recording_sessions` (`hostedPipelineState`)",
+                )
+            }
+        }
 }

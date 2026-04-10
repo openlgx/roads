@@ -29,4 +29,11 @@ data class UploadBatchEntity(
     val lastErrorCategory: String? = null,
     val lastSuccessfulUploadAtEpochMs: Long? = null,
     val networkPolicySnapshotJson: String? = null,
+    val localRawArtifactUri: String? = null,
+    val localFilteredArtifactUri: String? = null,
+    val remoteUploadJobId: String? = null,
+    val remoteStorageKey: String? = null,
+    val roadFilterSummaryJson: String? = null,
+    /** Redundant copy of [RecordingSessionEntity.uuid] for traceability in queue rows. */
+    val sourceSessionUuid: String? = null,
 )

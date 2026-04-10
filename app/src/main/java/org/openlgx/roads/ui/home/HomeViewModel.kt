@@ -17,6 +17,7 @@ import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.data.repo.RecordingSessionRepository
 import org.openlgx.roads.data.repo.session.SessionInspectionRepository
 import org.openlgx.roads.location.LocationRecordingController
+import org.openlgx.roads.processing.ondevice.SessionProcessingScheduler
 import org.openlgx.roads.location.LocationRecordingUiState
 import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.sensor.SensorRecordingUiState
@@ -57,7 +58,14 @@ constructor(
     sensorRecordingController: SensorRecordingController,
     recordingSessionRepository: RecordingSessionRepository,
     sessionInspectionRepository: SessionInspectionRepository,
+    sessionProcessingScheduler: SessionProcessingScheduler,
 ) : ViewModel() {
+
+    init {
+        // Same backfill entry point as [SessionsListViewModel]: pending analysis can complete
+        // without forcing navigation away from Home.
+        sessionProcessingScheduler.requestBackfillPendingProcessing()
+    }
 
     val uiState: StateFlow<HomeUiState> =
         combine(

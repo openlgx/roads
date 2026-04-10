@@ -1,0 +1,19 @@
+name: migration-check
+
+on:
+  push:
+    paths:
+      - "backend/sql/migrations/**"
+      - ".github/workflows/migration-check.yml"
+  pull_request:
+    paths:
+      - "backend/sql/migrations/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell migration smoke check
+        shell: pwsh
+        run: ./backend/scripts/validate-migrations.ps1

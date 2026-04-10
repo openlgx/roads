@@ -1,0 +1,6 @@
+psycopg[binary]>=3.1.18
+httpx>=0.27.0
+python-dotenv>=1.0.0
+
+# Geo stack for publish + roadpack (optional fail-soft in CI without GIS)
+shapely>=2.0.0

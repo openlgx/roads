@@ -13,20 +13,19 @@ It is written to align the Android collector, offline analysis tooling, future b
 - Android collector foundation is in place.
 - Passive trip lifecycle exists, including STOP_HOLD-style trip continuity at intersections / short stops.
 - Fused GNSS capture and IMU capture are persisted locally.
-- Room DB is at v4 with processing-related schema additions.
+- Room DB is at **v5** with on-device **processing** columns plus **hosted pipeline** visibility (`hostedPipelineState`) and extended **`upload_batches`** for the upload queue.
 - Session review exists on device, including WebView-based trip review and all-runs review.
 - On-device roughness/anomaly processing exists and is explicitly marked experimental.
 - Local export bundles include raw and derived artifacts.
 - Offline Python analysis tooling remains available and should continue to be the research bench.
+- **Hosted alpha foundation (in-repo):** Neon SQL migrations, Supabase Edge Functions (`uploads-create` / `uploads-complete` / `healthz` / `council-layers-*`), Python publish (`publish_council_layers.py`, fail-closed without boundary), processing scaffold, road-pack build script, GitHub Actions workflows, and Android **WorkManager** upload path + **road pack** loading / GeoJSON index / filtered export hooks (see [docs/backend.md](docs/backend.md), [docs/api-contract.md](docs/api-contract.md)).
 
 ### What is not yet production-ready
-- No backend ingestion pipeline is implemented.
-- No server-side database or API is implemented.
+- **Hosted pipeline is alpha:** server-side processing to full hosted roughness is still largely scaffolded; production keys, real LGA boundaries, and field-hardening are required before council-facing claims.
 - No model training pipeline is implemented.
 - No calibrated IRI model exists.
-- No robust road-network map matching exists.
-- No fleet/org multi-user workflow exists.
-- Upload policy/schema placeholders exist, but operational upload is not yet built.
+- No robust road-network map matching exists on device beyond pack-based proximity (no live OSM requirement by design for alpha).
+- No fleet/org multi-user workflow exists beyond seeded Neon rows.
 
 ---
 
@@ -160,16 +159,39 @@ Exit criteria:
 
 ---
 
-## Phase 5 - Backend ingestion MVP
-**Status:** Not started
+## Hosted alpha pipeline foundation
+**Status:** Scaffold implemented in repository (operator wiring and pilot data still required)
 
 Scope:
-- backend API for upload
-- authentication strategy (likely simple project/device token first)
-- upload queue implementation from Android
-- object/file storage for raw exports
-- ingestion service for normalized database writes
-- server-side processing job queue
+- **Neon** metadata schema (councils, projects, devices, sessions, upload/processing jobs, artifacts, published layer runs, road packs; hashed API keys).
+- **Supabase Storage** private buckets and **Edge Functions** for signed upload URLs and council layer reads (`COUNCIL_READ`).
+- **Android:** DataStore upload settings, WorkManager + OkHttp upload worker, `hostedPipelineState`, extended upload batch rows, **road pack** directory + GeoJSON `LocalRoadIndex`, `FilteredSessionExporter` (export-only filtering; raw Room rows unchanged).
+- **Python:** fail-closed council publish without authoritative boundary; processing runner scaffold; road-pack build + `road_packs` registration.
+- **CI:** migration validation, scheduled publish (12h, secrets optional), processing backfill dispatch, optional Supabase CLI deploy.
+
+Documentation:
+- [docs/backend.md](docs/backend.md), [docs/setup-hosted-alpha.md](docs/setup-hosted-alpha.md), [docs/api-contract.md](docs/api-contract.md), [docs/council-publishing.md](docs/council-publishing.md), [docs/road-filtering.md](docs/road-filtering.md)
+
+Exit criteria (for moving beyond “foundation”):
+- Pilot council has real **LGA boundary** and **road pack** registered.
+- **DEVICE_UPLOAD** and **COUNCIL_READ** keys issued and rotated procedure tested.
+- End-to-field test: `uploads-create` → signed PUT → `uploads-complete` → processing job visibility.
+- Privacy/policy copy for slugs and telemetry reviewed.
+
+**Mapping from on-device state:** `SessionHostedPipelineState` on `RecordingSessionEntity` tracks upload/remote visibility separately from on-device `processingState` where helpful; both may be shown in session detail UI.
+
+---
+
+## Phase 5 - Backend ingestion MVP
+**Status:** Partially overlapped by **Hosted alpha foundation** (upload path + metadata + workers); full MVP completion still pending
+
+Scope:
+- backend API for upload (**Edge Functions implemented**; expand validation and monitoring)
+- authentication strategy (**API keys in Neon implemented**; consider short-lived tokens later)
+- upload queue implementation from Android (**WorkManager path implemented**)
+- object/file storage for raw exports (**Supabase Storage**)
+- ingestion service for normalized database writes (**processing job scaffold**; expand to full parsing and hosted derived features)
+- server-side processing job queue (**implemented minimally**; scale and semantics TBD)
 
 ### Recommended first backend shape
 - API: lightweight service (FastAPI, NestJS, or similar)

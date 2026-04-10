@@ -5,6 +5,7 @@ import org.openlgx.roads.data.local.db.model.AnomalyType
 import org.openlgx.roads.data.local.db.model.BatchUploadState
 import org.openlgx.roads.data.local.db.model.RecordingSource
 import org.openlgx.roads.data.local.db.model.RoadEligibilityDisposition
+import org.openlgx.roads.data.local.db.model.SessionHostedPipelineState
 import org.openlgx.roads.data.local.db.model.SessionProcessingState
 import org.openlgx.roads.data.local.db.model.SessionState
 import org.openlgx.roads.data.local.db.model.SessionUploadState
@@ -40,7 +41,11 @@ class Converters {
 
     @TypeConverter
     fun toRoadEligibilityDisposition(value: String): RoadEligibilityDisposition =
-        RoadEligibilityDisposition.valueOf(value)
+        try {
+            RoadEligibilityDisposition.valueOf(value)
+        } catch (_: IllegalArgumentException) {
+            RoadEligibilityDisposition.UNKNOWN
+        }
 
     @TypeConverter
     fun fromAnomalyType(value: AnomalyType): String = value.name
@@ -54,4 +59,15 @@ class Converters {
     @TypeConverter
     fun toSessionProcessingState(value: String): SessionProcessingState =
         SessionProcessingState.valueOf(value)
+
+    @TypeConverter
+    fun fromSessionHostedPipelineState(value: SessionHostedPipelineState): String = value.name
+
+    @TypeConverter
+    fun toSessionHostedPipelineState(value: String): SessionHostedPipelineState =
+        try {
+            SessionHostedPipelineState.valueOf(value)
+        } catch (_: IllegalArgumentException) {
+            SessionHostedPipelineState.NOT_STARTED
+        }
 }

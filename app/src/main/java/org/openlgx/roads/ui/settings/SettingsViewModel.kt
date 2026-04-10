@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.data.local.settings.CaptureSettingsPreset
+import org.openlgx.roads.data.local.settings.UploadRoadFilterUnknownPolicy
 import javax.inject.Inject
 
 @HiltViewModel
@@ -50,6 +51,20 @@ constructor(
                     calibrationWorkflowEnabled = false,
                     lastRecordingStartedAtEpochMs = null,
                     lastRecordingStoppedAtEpochMs = null,
+                    uploadEnabled = false,
+                    uploadBaseUrl = "",
+                    uploadApiKey = "",
+                    uploadRetryLimit = 3,
+                    uploadAutoAfterSessionEnabled = false,
+                    uploadRoadFilterEnabled = false,
+                    uploadRoadFilterDistanceMeters = 40f,
+                    uploadRoadFilterUnknownPolicy = UploadRoadFilterUnknownPolicy.UPLOAD,
+                    uploadRoadPackRequiredForAutoUpload = true,
+                    uploadCouncilSlug = "",
+                    uploadProjectSlug = "",
+                    uploadProjectId = "",
+                    uploadDeviceId = "",
+                    uploadChargingPreferred = false,
                 ),
         )
 
@@ -131,5 +146,25 @@ constructor(
 
     fun setCalibrationWorkflowEnabled(enabled: Boolean) {
         viewModelScope.launch { appSettingsRepository.setCalibrationWorkflowEnabled(enabled) }
+    }
+
+    fun setUploadEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setUploadEnabled(enabled) }
+    }
+
+    fun setUploadAutoAfterSessionEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setUploadAutoAfterSessionEnabled(enabled) }
+    }
+
+    fun setUploadChargingPreferred(preferred: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setUploadChargingPreferred(preferred) }
+    }
+
+    fun setUploadRoadPackRequired(required: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setUploadRoadPackRequiredForAutoUpload(required) }
+    }
+
+    fun setUploadRoadFilterEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setUploadRoadFilterEnabled(enabled) }
     }
 }

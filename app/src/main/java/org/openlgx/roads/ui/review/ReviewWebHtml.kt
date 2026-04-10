@@ -159,6 +159,15 @@ internal fun tripReviewHtmlDocument(): String =
           BASE_TILE.addTo(MAP);
         }
 
+        function roughPopupHtml(roughLabel, sessionId, predHtml) {
+          var openTrip = '';
+          if (sessionId != null && window.RoadsAndroid && typeof window.RoadsAndroid.openSession === 'function') {
+            openTrip = '<br/><a href="#" class="open-trip-review" data-sid="' + sessionId + '" style="color:#1565c0;font-size:12px;font-weight:600">Open trip review →</a>';
+          }
+          var tripLine = sessionId != null ? '<br/>Trip #' + sessionId : '';
+          return '<div style="color:#111;font-size:12px">' + roughLabel + predHtml + tripLine + openTrip + '</div>';
+        }
+
         function refreshMapLayers(DATA) {
           if (!MAP) return;
           if (ROUTE_LAYER) { MAP.removeLayer(ROUTE_LAYER); ROUTE_LAYER = null; }
@@ -189,11 +198,8 @@ internal fun tripReviewHtmlDocument(): String =
                 var tw = (ww.roughnessProxy - wr.min) / (wr.max - wr.min);
                 var cw = heatColor(tw);
                 var wmk = L.circleMarker([ww.midLat, ww.midLon], { radius: 6, fillColor: cw, color: '#111', weight: 1, opacity: 0.9, fillOpacity: 0.85 });
-                if (ww.sessionId != null && window.RoadsAndroid && typeof window.RoadsAndroid.openSession === 'function') {
-                  wmk.on('click', (function(sid) { return function() { window.RoadsAndroid.openSession(String(sid)); }; })(ww.sessionId));
-                }
                 var predHtml = ww.pred != null ? '<br/>' + String(ww.pred) : '';
-                wmk.bindPopup('<div style="color:#111;font-size:12px">Roughness: ' + ww.roughnessProxy.toFixed(3) + predHtml + (ww.sessionId != null ? '<br/>Trip #' + ww.sessionId : '') + '</div>');
+                wmk.bindPopup(roughPopupHtml('Roughness: ' + ww.roughnessProxy.toFixed(3), ww.sessionId, predHtml));
                 wmk.addTo(ROUGH_LAYER);
               }
               drewFromWindows = ROUGH_LAYER.getLayers().length > 0;
@@ -206,10 +212,7 @@ internal fun tripReviewHtmlDocument(): String =
                 var t = (p.roughnessNorm - range.min) / (range.max - range.min);
                 var c = heatColor(t);
                 var m = L.circleMarker([p.lat, p.lon], { radius: 5, fillColor: c, color: '#111', weight: 1, opacity: 0.9, fillOpacity: 0.85 });
-                if (p.sessionId != null && window.RoadsAndroid && typeof window.RoadsAndroid.openSession === 'function') {
-                  m.on('click', (function(sid) { return function() { window.RoadsAndroid.openSession(String(sid)); }; })(p.sessionId));
-                }
-                m.bindPopup('<div style="color:#111;font-size:12px">Roughness: ' + p.roughnessNorm.toFixed(3) + (p.sessionId != null ? '<br/>Trip #' + p.sessionId : '') + '</div>');
+                m.bindPopup(roughPopupHtml('Roughness: ' + p.roughnessNorm.toFixed(3), p.sessionId, ''));
                 m.addTo(ROUGH_LAYER);
               }
             }
@@ -262,6 +265,20 @@ internal fun tripReviewHtmlDocument(): String =
             return;
           }
           MAP = L.map('map', { zoomControl: true });
+          MAP.on('popupopen', function(e) {
+            var container = e.popup.getElement();
+            if (!container) return;
+            var link = container.querySelector('.open-trip-review');
+            if (!link) return;
+            L.DomEvent.once(link, 'click', function(ev) {
+              L.DomEvent.stopPropagation(ev);
+              L.DomEvent.preventDefault(ev);
+              var sid = link.getAttribute('data-sid');
+              if (sid && window.RoadsAndroid && typeof window.RoadsAndroid.openSession === 'function') {
+                window.RoadsAndroid.openSession(sid);
+              }
+            });
+          });
           setBasemap(ACTIVE_BASE);
           refreshMapLayers(DATA);
           function fixMapLayout() {

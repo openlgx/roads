@@ -2,6 +2,7 @@ package org.openlgx.roads.ui.sessions
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,15 +18,26 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.text.DateFormat
 import org.openlgx.roads.data.local.db.model.SessionListStats
 import org.openlgx.roads.ui.review.TripReviewWebView
 
@@ -46,6 +58,42 @@ fun SessionsListScreen(
         sessions.joinToString("|") { "${it.id}:${it.processingState}:${it.derivedWindowCount}" }
     LaunchedEffect(processingDigest, excludedFromMap) {
         viewModel.refreshMap()
+    }
+
+    var mapFullscreen by remember { mutableStateOf(false) }
+
+    if (mapFullscreen && mapB64 != null) {
+        Dialog(
+            onDismissRequest = { mapFullscreen = false },
+            properties =
+                DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                ),
+        ) {
+            Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    TripReviewWebView(
+                        payloadBase64 = mapB64,
+                        modifier = Modifier.fillMaxSize(),
+                        onOpenSessionFromMap = onOpenSession,
+                    )
+                    IconButton(
+                        onClick = { mapFullscreen = false },
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Exit full screen map",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        }
     }
 
     Scaffold(
@@ -88,7 +136,16 @@ fun SessionsListScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )
-                    } else {
+                    } else if (mapB64 != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(onClick = { mapFullscreen = true }) {
+                                Text("Full screen map")
+                            }
+                        }
                         TripReviewWebView(
                             payloadBase64 = mapB64,
                             modifier =
@@ -175,8 +232,11 @@ private fun SessionListRowBody(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Session ${row.id} · ${row.uuid.take(8)}…", style = MaterialTheme.typography.titleSmall)
+        val fmt = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM)
         Text(
-            "Started: ${row.startedAtEpochMs}  State: ${row.state}  Source: ${row.recordingSource}",
+            "Started: ${fmt.format(row.startedAtEpochMs)} · " +
+                "Ended: ${row.endedAtEpochMs?.let { fmt.format(it) } ?: "—"} · " +
+                "State: ${row.state} · Source: ${row.recordingSource}",
             style = MaterialTheme.typography.bodySmall,
         )
         Text(

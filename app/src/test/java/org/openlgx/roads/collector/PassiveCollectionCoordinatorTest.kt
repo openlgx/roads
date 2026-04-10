@@ -41,6 +41,7 @@ import org.openlgx.roads.service.CollectorForegroundPresentationRegistry
 import org.openlgx.roads.service.CollectorForegroundServiceController
 import org.openlgx.roads.service.CollectorServiceStateRegistry
 import org.openlgx.roads.service.RecordingEventNotifier
+import org.openlgx.roads.upload.SessionUploadScheduling
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -83,6 +84,7 @@ class PassiveCollectionCoordinatorTest {
                     serviceStateRegistry = CollectorServiceStateRegistry(),
                     sessionCalibrationHook = NoOpSessionCalibrationHook,
                     sessionProcessingScheduler = NoOpSessionProcessingScheduler,
+                    sessionUploadScheduling = SessionUploadScheduling { _, _ -> },
                     foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
                     recordingEventNotifier =
                         RecordingEventNotifier(ApplicationProvider.getApplicationContext()),
@@ -135,6 +137,7 @@ class PassiveCollectionCoordinatorTest {
                     serviceStateRegistry = CollectorServiceStateRegistry(),
                     sessionCalibrationHook = NoOpSessionCalibrationHook,
                     sessionProcessingScheduler = NoOpSessionProcessingScheduler,
+                    sessionUploadScheduling = SessionUploadScheduling { _, _ -> },
                     foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
                     recordingEventNotifier =
                         RecordingEventNotifier(ApplicationProvider.getApplicationContext()),
@@ -154,6 +157,107 @@ class PassiveCollectionCoordinatorTest {
             assertEquals(1, fg.starts)
             assertEquals(1L, fg.lastSessionId)
         }
+
+    @Test
+    fun `orphan db open session is completed when coordinator is idle`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val scope = CoroutineScope(SupervisorJob() + dispatcher)
+
+            val settingsRepo = FakeAppSettingsRepository(effectiveOnboardingPassiveOn())
+            val drivingSnap =
+                ActivityRecognitionSnapshot(
+                    playServicesAvailable = true,
+                    updatesActive = true,
+                    lastErrorMessage = null,
+                    likelyInVehicle = true,
+                    lastDetectedActivityType = DetectedActivity.IN_VEHICLE,
+                    lastConfidence = 60,
+                    lastUpdateEpochMs = 1L,
+                )
+            val gateway = FakeActivityGateway(MutableStateFlow(drivingSnap))
+            val repo = FakeRecordingSessionRepositoryWithOrphan(orphanId = 42L)
+            val scheduled = mutableListOf<Long>()
+            val scheduler =
+                object : SessionProcessingScheduler {
+                    override fun onSessionRecordingCompleted(sessionId: Long) {
+                        scheduled.add(sessionId)
+                    }
+
+                    override fun requestReprocess(sessionId: Long) = Unit
+
+                    override fun requestBackfillPendingProcessing() = Unit
+                }
+
+            val coordinator =
+                PassiveCollectionCoordinator(
+                    appSettingsRepository = settingsRepo,
+                    activityRecognitionGateway = gateway,
+                    recordingSessionRepository = repo,
+                    foregroundServiceController = FakeForegroundServiceController(),
+                    permissionChecker =
+                        FakeArPermissionChecker(
+                            context = ApplicationProvider.getApplicationContext(),
+                            granted = true,
+                        ),
+                    fineLocationPermissionChecker =
+                        AlwaysFineLocation(ApplicationProvider.getApplicationContext()),
+                    armingDrivingGate = ArmingDrivingGate { _: Float -> true },
+                    locationRecordingController = FakeLocationRecordingController(),
+                    sensorRecordingController = FakeSensorRecordingController(),
+                    serviceStateRegistry = CollectorServiceStateRegistry(),
+                    sessionCalibrationHook = NoOpSessionCalibrationHook,
+                    sessionProcessingScheduler = scheduler,
+                    sessionUploadScheduling = SessionUploadScheduling { _, _ -> },
+                    foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
+                    recordingEventNotifier =
+                        RecordingEventNotifier(ApplicationProvider.getApplicationContext()),
+                    applicationScope = scope,
+                )
+
+            coordinator.start()
+            advanceUntilIdle()
+
+            assertEquals(42L, repo.lastEndedSessionId)
+            assertEquals(SessionState.COMPLETED, repo.lastEndedState)
+            assertEquals(listOf(42L), scheduled)
+            assertEquals(true, repo.orphanClosedInDb)
+        }
+
+    private class FakeRecordingSessionRepositoryWithOrphan(
+        private val orphanId: Long,
+    ) : RecordingSessionRepository {
+        private var id = 0L
+        var lastEndedSessionId: Long? = null
+        var lastEndedState: SessionState? = null
+        var orphanClosedInDb: Boolean = false
+
+        override suspend fun beginAutoRecordingSession(params: AutoRecordingSessionStartParams): Long {
+            id += 1
+            return id
+        }
+
+        override suspend fun updateSensorCaptureSnapshot(
+            sessionId: Long,
+            json: String?,
+        ) = Unit
+
+        override suspend fun endRecordingSession(
+            sessionId: Long,
+            endedAtEpochMs: Long,
+            endState: SessionState,
+        ) {
+            lastEndedSessionId = sessionId
+            lastEndedState = endState
+            orphanClosedInDb = true
+        }
+
+        override suspend fun countSessions(): Long = 0L
+
+        override suspend fun findOpenSessionId(): Long? = if (orphanClosedInDb) null else orphanId
+
+        override fun observeRecordingSessionCount() = flowOf(0L)
+    }
 
     private class FakeActivityGateway(
         private val backing: MutableStateFlow<ActivityRecognitionSnapshot>,

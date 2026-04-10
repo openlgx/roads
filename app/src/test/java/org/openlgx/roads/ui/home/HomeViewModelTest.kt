@@ -20,10 +20,17 @@ import org.openlgx.roads.data.repo.session.FakeSessionInspectionRepository
 import org.openlgx.roads.location.LocationRecordingController
 import org.openlgx.roads.location.LocationRecordingUiState
 import org.openlgx.roads.sensor.SensorAvailabilitySnapshot
+import org.openlgx.roads.processing.ondevice.SessionProcessingScheduler
 import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.sensor.SensorRecordingUiState
 
 class HomeViewModelTest {
+
+    private object NoOpSessionProcessingScheduler : SessionProcessingScheduler {
+        override fun onSessionRecordingCompleted(sessionId: Long) = Unit
+        override fun requestReprocess(sessionId: Long) = Unit
+        override fun requestBackfillPendingProcessing() = Unit
+    }
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
@@ -62,7 +69,16 @@ class HomeViewModelTest {
             val sensor = FakeSensorRecordingHome()
             val sessions = FakeRecordingSessionRepositoryFlow()
             val inspect = FakeSessionInspectionRepository()
-            val vm = HomeViewModel(repo, collector, location, sensor, sessions, inspect)
+            val vm =
+                HomeViewModel(
+                    repo,
+                    collector,
+                    location,
+                    sensor,
+                    sessions,
+                    inspect,
+                    NoOpSessionProcessingScheduler,
+                )
             advanceUntilIdle()
 
             assertFalse(vm.uiState.value.passiveCollectionEffective)
@@ -98,7 +114,16 @@ class HomeViewModelTest {
             val sensor = FakeSensorRecordingHome()
             val sessions = FakeRecordingSessionRepositoryFlow()
             val inspect = FakeSessionInspectionRepository()
-            val vm = HomeViewModel(repo, collector, location, sensor, sessions, inspect)
+            val vm =
+                HomeViewModel(
+                    repo,
+                    collector,
+                    location,
+                    sensor,
+                    sessions,
+                    inspect,
+                    NoOpSessionProcessingScheduler,
+                )
             advanceUntilIdle()
 
             assertEquals(CollectorLifecycleState.ARMING, vm.uiState.value.collector.lifecycleState)
@@ -154,7 +179,16 @@ class HomeViewModelTest {
                 )
             val sessions = FakeRecordingSessionRepositoryFlow(initialSessionCount = 11L)
             val inspect = FakeSessionInspectionRepository()
-            val vm = HomeViewModel(repo, collector, location, sensor, sessions, inspect)
+            val vm =
+                HomeViewModel(
+                    repo,
+                    collector,
+                    location,
+                    sensor,
+                    sessions,
+                    inspect,
+                    NoOpSessionProcessingScheduler,
+                )
             advanceUntilIdle()
 
             assertEquals(11L, vm.uiState.value.recordingSessionCount)

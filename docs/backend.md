@@ -1,63 +1,65 @@
-# Backend architecture (planned)
+# Backend architecture (hosted alpha)
 
-This document sketches the **intended** server-side shape so contributors and agents can align on ingestion, storage, and training data flow. Nothing here is implemented in this repository yet; the Android app remains local-first until Phase 5 in [ROADMAP.md](../ROADMAP.md).
+This document describes the **in-repo hosted alpha foundation**: Neon metadata, Supabase Storage + Edge Functions, Python runners, and CI. The Android app remains **local-first**; cloud paths are **additive** (upload, publish, council reads).
+
+For operator setup (secrets, rotation, CLI), see [setup-hosted-alpha.md](setup-hosted-alpha.md). For HTTP/JSON schemas, see [api-contract.md](api-contract.md).
 
 ---
 
 ## Goals
 
-- Accept **session export bundles** (ZIP + manifest) from the Android app without storing huge blobs in Postgres.
-- Keep **metadata and queryable fields** in **Neon (Postgres)**.
-- Run **async workers** to parse uploads, optionally re-run or validate processing, and feed labelling/training pipelines later.
+- Accept **session export bundles** (ZIP + manifest) from Android without storing large blobs in Postgres.
+- Keep **metadata and job state** in **Neon (Postgres)**; Edge Functions connect via **`DATABASE_URL` / `DATABASE_URL_POOLED`**.
+- Store ZIPs and published layers in **Supabase Storage** (private buckets); serve uploads via **signed PUT**; serve council layers via Edge Functions using **service role** after **`COUNCIL_READ`** validation.
+- Run **publish** and **processing** jobs from Python + GitHub Actions with fail-safe behaviour when secrets are absent.
+
+**Invariant:** OLGX app schema in Neon is the single metadata source for this release; Supabase Postgres (`SUPABASE_DB_*`) is documented but **not** used for duplicate OLGX tables.
 
 ---
 
-## Storage split
+## Layout (repository)
 
-| Layer | Technology (recommended) | Holds |
-|--------|--------------------------|--------|
-| Metadata DB | Neon Postgres | Orgs, projects, devices, session rows, upload manifests, label rows, aggregate stats, model version records |
-| Object storage | S3-compatible bucket (or vendor equivalent) | Raw ZIP exports, large CSV/JSON artifacts, training snapshots, model binaries |
+| Layer | Path | Holds |
+|-------|------|-------|
+| SQL migrations | `backend/sql/migrations/` | Extensions, councils/projects/devices, sessions, jobs, artifacts, published runs, optional hosted derived tables |
+| Edge Functions | `backend/supabase/functions/` | `uploads-create`, `uploads-complete`, `healthz`, `council-layers-*` |
+| Shared TS | `backend/supabase/functions/_shared/` | CORS, JSON, errors, env, Neon (`postgres`), auth (hashed API keys), storage path builders |
+| Publish | `backend/publish/` | `publish_council_layers.py` — fail-closed without LGA boundary |
+| Processing | `backend/processing/` | `run_processing_job.py` — scaffold: download, validate, state machine |
+| Road pack | `backend/roadpack-build/` | `build_road_pack.py` — clip, version, checksum, Storage upload, `road_packs` row |
+| CI | `.github/workflows/` | Migration check, 12h publish, processing backfill, optional Supabase deploy |
 
-**Rule:** PostgreSQL stores **pointers** (`s3://…` or HTTPS URLs), checksums, sizes, and parsing-derived columns—not megabyte-scale sensor dumps as row bodies.
-
----
-
-## Identity model (sketch)
-
-- **Project / org:** tenant boundary for uploads and labels.
-- **Device:** stable id (Android app installation or hardware-derived token); linked to project.
-- **Recording session:** matches app `RecordingSession` / export `session.json` id and UUID; server row links to manifest and blob keys.
-
-Exact naming should align with the frozen **export manifest** schema (see README export section) when the MVP is built.
+**Rule:** Postgres stores pointers (storage keys), checksums, sizes, state enums—not megabyte-scale sensor dumps as row bodies.
 
 ---
 
-## Upload API contract (MVP target)
+## Storage key contract
 
-High-level steps:
+Path builders are shared conceptually with Python (`backend/publish/libs/paths.py`). Month is always **two-digit** `mm` (UTC).
 
-1. **Create upload intent** — client sends manifest metadata (session id, uuid, byte size, export schema version, checksum). Server returns a **presigned PUT URL** or upload token for the blob.
-2. **PUT bundle** — client uploads ZIP to object storage.
-3. **Complete upload** — client notifies server; server verifies checksum, enqueues **ingestion job**.
-4. **Worker** — job unpacks ZIP, validates files, writes/updates `sessions` and related tables, stores blob paths; optionally triggers server-side reprocessing later.
-
-Authentication for early MVP: **project-scoped API key** or **device-scoped JWT**—to be chosen when implementation starts.
+- `raw/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip`
+- `filtered/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip`
+- `roadpacks/{councilSlug}/{version}/public-roads.fgb`
+- `published/{councilSlug}/roughness/latest.geojson` (and `anomalies`, `consensus`)
+- `published/{councilSlug}/manifest.json`
 
 ---
 
-## Neon schema (illustrative tables)
+## Identity model
 
-Names are indicative; migrate with real SQL when implementing.
+- **Council** → **projects** (`(council_id, slug)` unique).
+- **Device** registered per project; **`client_session_uuid`** on server aligns with app `RecordingSessionEntity.uuid`.
+- **`api_keys`:** `DEVICE_UPLOAD` (upload endpoints), `COUNCIL_READ` (layer GET), `INTERNAL_ADMIN` (reserved); hashed at rest.
 
-- `organizations`, `projects`
-- `devices` (project_id, device_public_id, …)
-- `recording_sessions` (project_id, device_id, client_session_id, uuid, started_at, ended_at, processing_state, blob_manifest_uri, export_schema_version, …)
-- `upload_jobs` (session_id, status, error, created_at, …)
-- `labels` (session_id or window/s segment ref, taxonomy, author, created_at, …) — Phase 4+
-- `segment_aggregates`, `model_versions`, `validation_runs` — later phases
+---
 
-Derived feature **rows** can mirror on-device tables at a coarse level (counts, summary stats) with optional references back to parquet/CSV in object storage for heavy analytics.
+## Upload flow (high level)
+
+1. **POST** `uploads-create` — validate body, upsert `recording_sessions`, insert `upload_jobs`, return **signed PUT** for bucket + object key.
+2. **PUT** ZIP to Storage using returned URL and headers.
+3. **POST** `uploads-complete` — verify size/checksum, finalize job, insert `artifact`, enqueue `processing_jobs` (idempotent).
+
+See [api-contract.md](api-contract.md) for normative JSON.
 
 ---
 
@@ -65,46 +67,52 @@ Derived feature **rows** can mirror on-device tables at a coarse level (counts, 
 
 ```mermaid
 flowchart LR
-  subgraph client [Android]
+  subgraph android [Android]
     A[Export ZIP]
   end
-  subgraph api [API]
-    B[Upload intent]
-    C[Complete upload]
+  subgraph edge [Edge Functions]
+    B[uploads-create]
+    C[uploads-complete]
   end
-  subgraph store [Object storage]
+  subgraph store [Storage]
     D[Bundle blob]
   end
   subgraph db [Neon]
-    E[Sessions / manifests]
+    E[Sessions / jobs / artifacts]
   end
-  subgraph worker [Worker]
-    F[Parse ZIP]
-    G[Validate schema]
-    H[Write metadata]
+  subgraph worker [Python CI]
+    F[run_processing_job]
+    G[publish_council_layers]
   end
   A --> B
   B --> D
+  A --> C
   C --> F
-  F --> G --> H --> E
+  C --> E
   D --> F
+  G --> store
+  G --> db
 ```
-
-Future: optional queue for **recompute derived features** server-side (must not replace raw truth; should be versioned).
 
 ---
 
-## Model-training data flow
+## Android integration (summary)
 
-1. **Curate** labelled sessions in Postgres (Phase 4).
-2. **Materialize** training datasets via batch jobs: read manifests → pull blobs → emit versioned dataset in object storage (e.g. Parquet) with a **dataset version** row in Neon.
-3. **Train** offline (Python or other) with experiments tracked; store **model version** + metrics in Neon; artifacts in object storage.
-4. **Compare** always against the **on-device heuristic baseline** documented in the roadmap.
+- **Room v5** adds `hostedPipelineState` and extended **`upload_batches`** for upload queue metadata.
+- **WorkManager** + Hilt: `SessionUploadWorker` uses OkHttp against `uploads-create` / `uploads-complete`.
+- **Settings:** `uploadEnabled`, base URL, API key, retry limits, Wi‑Fi / charging policies, road filter toggles — see `AppSettings` and [road-filtering.md](road-filtering.md).
+
+---
+
+## Council publishing
+
+- **12-hour** scheduled publish; **fail-closed** if LGA boundary missing — see [council-publishing.md](council-publishing.md).
+- **Versioned** `manifest.json` under `published/{councilSlug}/`.
 
 ---
 
 ## Related docs
 
-- [ROADMAP.md](../ROADMAP.md) — phased delivery and decisions
-- [README.md](../README.md) — current Android capabilities and export shape
+- [ROADMAP.md](../ROADMAP.md) — phases; **Hosted alpha foundation**
+- [README.md](../README.md) — Android capabilities, export schema, build commands
 - [Neon pricing](https://neon.com/pricing), [Neon Open Source Program](https://neon.com/programs/open-source)

@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.data.local.settings.CaptureSettingsPreset
+import org.openlgx.roads.data.local.settings.UploadRoadFilterUnknownPolicy
 
 /**
  * Test double for ViewModel unit tests; setters are no-ops unless you mutate [mutState] externally.
@@ -73,4 +74,32 @@ class FakeAppSettingsRepository(
     override suspend fun recordRecordingStartedAt(epochMs: Long) = Unit
 
     override suspend fun recordRecordingStoppedAt(epochMs: Long) = Unit
+
+    override suspend fun setUploadEnabled(enabled: Boolean) = Unit
+
+    override suspend fun setUploadBaseUrl(url: String) = Unit
+
+    override suspend fun setUploadApiKey(key: String) = Unit
+
+    override suspend fun setUploadRetryLimit(limit: Int) = Unit
+
+    override suspend fun setUploadAutoAfterSessionEnabled(enabled: Boolean) = Unit
+
+    override suspend fun setUploadRoadFilterEnabled(enabled: Boolean) = Unit
+
+    override suspend fun setUploadRoadFilterDistanceMeters(meters: Float) = Unit
+
+    override suspend fun setUploadRoadFilterUnknownPolicy(policy: UploadRoadFilterUnknownPolicy) = Unit
+
+    override suspend fun setUploadRoadPackRequiredForAutoUpload(required: Boolean) = Unit
+
+    override suspend fun setUploadCouncilSlug(slug: String) = Unit
+
+    override suspend fun setUploadProjectSlug(slug: String) = Unit
+
+    override suspend fun setUploadProjectId(id: String) = Unit
+
+    override suspend fun setUploadDeviceId(id: String) = Unit
+
+    override suspend fun setUploadChargingPreferred(preferred: Boolean) = Unit
 }

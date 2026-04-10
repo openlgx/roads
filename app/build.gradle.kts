@@ -163,6 +163,11 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.play.services.location)
+    /** Hosted alpha: background upload */
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+    implementation(libs.okhttp)
     implementation(libs.timber)
 
     debugImplementation(libs.androidx.compose.ui.tooling)

@@ -1,0 +1,26 @@
+name: processing-backfill
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "15 */6 * * *"
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.DATABASE_URL != '' && secrets.SUPABASE_SECRET_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r backend/processing/requirements.txt
+      - name: Run processing worker
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_RAW_BUCKET: ${{ secrets.SUPABASE_RAW_BUCKET }}
+          PROCESSING_MAX_JOBS: "5"
+        working-directory: backend/processing
+        run: python run_processing_job.py

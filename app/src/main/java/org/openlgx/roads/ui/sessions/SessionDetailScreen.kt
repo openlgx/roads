@@ -83,6 +83,8 @@ fun SessionDetailScreen(
                 "processingSummaryJson: ${s.processingSummaryJson ?: "—"}",
                 style = MaterialTheme.typography.bodySmall,
             )
+            Text("Hosted pipeline (upload / remote)", style = MaterialTheme.typography.titleMedium)
+            Text("hostedPipelineState: ${s.hostedPipelineState}")
             Text("roughnessProxyScore: ${s.roughnessProxyScore ?: "—"} (${s.roughnessMethodVersion ?: "—"})")
             Text("roadResponseScore: ${s.roadResponseScore ?: "—"} (${s.roadResponseMethodVersion ?: "—"})")
 

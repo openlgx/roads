@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -48,6 +49,20 @@ constructor(
         val calibrationWorkflowEnabled = booleanPreferencesKey("calibration_workflow_enabled")
         val lastRecordingStartedAtEpochMs = longPreferencesKey("last_recording_started_at_epoch_ms")
         val lastRecordingStoppedAtEpochMs = longPreferencesKey("last_recording_stopped_at_epoch_ms")
+        val uploadEnabled = booleanPreferencesKey("upload_enabled")
+        val uploadBaseUrl = stringPreferencesKey("upload_base_url")
+        val uploadApiKey = stringPreferencesKey("upload_api_key")
+        val uploadRetryLimit = intPreferencesKey("upload_retry_limit")
+        val uploadAutoAfterSession = booleanPreferencesKey("upload_auto_after_session")
+        val uploadRoadFilterEnabled = booleanPreferencesKey("upload_road_filter_enabled")
+        val uploadRoadFilterDistanceM = floatPreferencesKey("upload_road_filter_distance_m")
+        val uploadRoadFilterUnknown = stringPreferencesKey("upload_road_filter_unknown_policy")
+        val uploadRoadPackRequired = booleanPreferencesKey("upload_road_pack_required")
+        val uploadCouncilSlug = stringPreferencesKey("upload_council_slug")
+        val uploadProjectSlug = stringPreferencesKey("upload_project_slug")
+        val uploadProjectId = stringPreferencesKey("upload_project_id")
+        val uploadDeviceId = stringPreferencesKey("upload_device_id")
+        val uploadChargingPreferred = booleanPreferencesKey("upload_charging_preferred")
     }
 
     override val settings: Flow<AppSettings> =
@@ -101,6 +116,28 @@ constructor(
                 calibrationWorkflowEnabled = prefs[Keys.calibrationWorkflowEnabled] ?: false,
                 lastRecordingStartedAtEpochMs = prefs[Keys.lastRecordingStartedAtEpochMs],
                 lastRecordingStoppedAtEpochMs = prefs[Keys.lastRecordingStoppedAtEpochMs],
+                uploadEnabled = prefs[Keys.uploadEnabled] ?: false,
+                uploadBaseUrl = prefs[Keys.uploadBaseUrl] ?: "",
+                uploadApiKey = prefs[Keys.uploadApiKey] ?: "",
+                uploadRetryLimit = prefs[Keys.uploadRetryLimit] ?: 3,
+                uploadAutoAfterSessionEnabled = prefs[Keys.uploadAutoAfterSession] ?: false,
+                uploadRoadFilterEnabled = prefs[Keys.uploadRoadFilterEnabled] ?: false,
+                uploadRoadFilterDistanceMeters =
+                    prefs[Keys.uploadRoadFilterDistanceM] ?: DEFAULT_UPLOAD_ROAD_FILTER_DISTANCE_M,
+                uploadRoadFilterUnknownPolicy =
+                    prefs[Keys.uploadRoadFilterUnknown]?.let { raw ->
+                        try {
+                            UploadRoadFilterUnknownPolicy.valueOf(raw)
+                        } catch (_: IllegalArgumentException) {
+                            UploadRoadFilterUnknownPolicy.UPLOAD
+                        }
+                    } ?: UploadRoadFilterUnknownPolicy.UPLOAD,
+                uploadRoadPackRequiredForAutoUpload = prefs[Keys.uploadRoadPackRequired] ?: true,
+                uploadCouncilSlug = prefs[Keys.uploadCouncilSlug] ?: "",
+                uploadProjectSlug = prefs[Keys.uploadProjectSlug] ?: "",
+                uploadProjectId = prefs[Keys.uploadProjectId] ?: "",
+                uploadDeviceId = prefs[Keys.uploadDeviceId] ?: "",
+                uploadChargingPreferred = prefs[Keys.uploadChargingPreferred] ?: false,
             )
         }
 
@@ -265,6 +302,64 @@ constructor(
         dataStore.edit { it[Keys.lastRecordingStoppedAtEpochMs] = epochMs }
     }
 
+    override suspend fun setUploadEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.uploadEnabled] = enabled }
+    }
+
+    override suspend fun setUploadBaseUrl(url: String) {
+        dataStore.edit { it[Keys.uploadBaseUrl] = url }
+    }
+
+    override suspend fun setUploadApiKey(key: String) {
+        dataStore.edit { it[Keys.uploadApiKey] = key }
+    }
+
+    override suspend fun setUploadRetryLimit(limit: Int) {
+        require(limit in 1..20)
+        dataStore.edit { it[Keys.uploadRetryLimit] = limit }
+    }
+
+    override suspend fun setUploadAutoAfterSessionEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.uploadAutoAfterSession] = enabled }
+    }
+
+    override suspend fun setUploadRoadFilterEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.uploadRoadFilterEnabled] = enabled }
+    }
+
+    override suspend fun setUploadRoadFilterDistanceMeters(meters: Float) {
+        require(meters in 5f..200f)
+        dataStore.edit { it[Keys.uploadRoadFilterDistanceM] = meters }
+    }
+
+    override suspend fun setUploadRoadFilterUnknownPolicy(policy: UploadRoadFilterUnknownPolicy) {
+        dataStore.edit { it[Keys.uploadRoadFilterUnknown] = policy.name }
+    }
+
+    override suspend fun setUploadRoadPackRequiredForAutoUpload(required: Boolean) {
+        dataStore.edit { it[Keys.uploadRoadPackRequired] = required }
+    }
+
+    override suspend fun setUploadCouncilSlug(slug: String) {
+        dataStore.edit { it[Keys.uploadCouncilSlug] = slug }
+    }
+
+    override suspend fun setUploadProjectSlug(slug: String) {
+        dataStore.edit { it[Keys.uploadProjectSlug] = slug }
+    }
+
+    override suspend fun setUploadProjectId(id: String) {
+        dataStore.edit { it[Keys.uploadProjectId] = id }
+    }
+
+    override suspend fun setUploadDeviceId(id: String) {
+        dataStore.edit { it[Keys.uploadDeviceId] = id }
+    }
+
+    override suspend fun setUploadChargingPreferred(preferred: Boolean) {
+        dataStore.edit { it[Keys.uploadChargingPreferred] = preferred }
+    }
+
     private companion object {
         const val DEFAULT_CAPTURE_START_SPEED_MPS = 2.8f
         const val DEFAULT_CAPTURE_IMMEDIATE_START_SPEED_MPS = 4.5f
@@ -276,5 +371,6 @@ constructor(
         const val DEFAULT_PROCESSING_DISTANCE_BIN_M = 10f
         const val DEFAULT_PROCESSING_LIVE_AFTER_SESSION = true
         const val DEFAULT_PROCESSING_ALL_RUNS_OVERLAY = true
+        const val DEFAULT_UPLOAD_ROAD_FILTER_DISTANCE_M = 40f
     }
 }

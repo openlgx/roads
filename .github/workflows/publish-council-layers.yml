@@ -1,0 +1,27 @@
+name: publish-council-layers
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.DATABASE_URL != '' && secrets.SUPABASE_SECRET_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install -r backend/publish/requirements.txt
+      - name: Run publish
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_PUBLISHED_BUCKET: ${{ secrets.SUPABASE_PUBLISHED_BUCKET }}
+          PUBLISHER_VERSION: ${{ secrets.PUBLISHER_VERSION }}
+        working-directory: backend/publish
+        run: python publish_council_layers.py

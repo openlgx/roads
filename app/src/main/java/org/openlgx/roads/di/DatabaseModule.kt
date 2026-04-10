@@ -21,6 +21,9 @@ object DatabaseModule {
         @ApplicationContext context: Context,
     ): RoadsDatabase =
         Room.databaseBuilder(context, RoadsDatabase::class.java, "roads.db")
-            .addMigrations(RoadsDatabaseMigrations.MIGRATION_3_4)
+            .addMigrations(
+                RoadsDatabaseMigrations.MIGRATION_3_4,
+                RoadsDatabaseMigrations.MIGRATION_4_5,
+            )
             .build()
 }

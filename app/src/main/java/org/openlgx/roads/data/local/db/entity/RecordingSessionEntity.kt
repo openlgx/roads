@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import org.openlgx.roads.data.local.db.model.RecordingSource
+import org.openlgx.roads.data.local.db.model.SessionHostedPipelineState
 import org.openlgx.roads.data.local.db.model.SessionProcessingState
 import org.openlgx.roads.data.local.db.model.SessionState
 import org.openlgx.roads.data.local.db.model.SessionUploadState
@@ -54,4 +55,6 @@ data class RecordingSessionEntity(
     val processingLastError: String? = null,
     /** Rich aggregates JSON; workflow uses [processingState] columns first. */
     val processingSummaryJson: String? = null,
+    /** Hosted alpha: remote upload + server processing visibility. */
+    val hostedPipelineState: SessionHostedPipelineState = SessionHostedPipelineState.NOT_STARTED,
 )

@@ -24,6 +24,15 @@ captures/
 # Logs
 *.log
 
+# Backend / Cursor local secrets (see backend/.env.example)
+backend/.env
+backend/.env.local
+.env
+.env.local
+
+# Supabase CLI local link state (may contain project URLs; keep out of git)
+supabase/.temp/
+
 # Python offline analysis (local outputs / venv)
 analysis_output/
 .venv_analysis/

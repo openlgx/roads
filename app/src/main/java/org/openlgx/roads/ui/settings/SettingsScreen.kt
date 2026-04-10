@@ -98,6 +98,41 @@ fun SettingsScreen(
                 Text("Set threshold to 25% (quick test)")
             }
 
+            Text("Hosted alpha upload", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Additive cloud upload (Supabase Edge + Neon). Set base URL, API key, project + device UUIDs via repository/debug tooling; see docs/setup-hosted-alpha.md.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            SettingToggleRow(
+                title = "Enable hosted upload",
+                checked = settings.uploadEnabled,
+                onCheckedChange = viewModel::setUploadEnabled,
+            )
+            SettingToggleRow(
+                title = "Auto-queue upload after completed session",
+                checked = settings.uploadAutoAfterSessionEnabled,
+                onCheckedChange = viewModel::setUploadAutoAfterSessionEnabled,
+            )
+            SettingToggleRow(
+                title = "Require road pack for auto-upload",
+                checked = settings.uploadRoadPackRequiredForAutoUpload,
+                onCheckedChange = viewModel::setUploadRoadPackRequired,
+            )
+            SettingToggleRow(
+                title = "Prefer charging (soft; does not block when unplugged)",
+                checked = settings.uploadChargingPreferred,
+                onCheckedChange = viewModel::setUploadChargingPreferred,
+            )
+            SettingToggleRow(
+                title = "Upload road filter (alpha; traceability)",
+                checked = settings.uploadRoadFilterEnabled,
+                onCheckedChange = viewModel::setUploadRoadFilterEnabled,
+            )
+            Text(
+                "Council slug: \"${settings.uploadCouncilSlug}\" — pack under files/road_packs/{slug}/",
+                style = MaterialTheme.typography.bodySmall,
+            )
+
             Text("Local storage safety (placeholders)", style = MaterialTheme.typography.titleMedium)
             Text("Retention days: ${settings.retentionDays}", style = MaterialTheme.typography.bodyMedium)
             Button(onClick = { viewModel.setRetentionDays(30) }) { Text("Retention: 30 days") }

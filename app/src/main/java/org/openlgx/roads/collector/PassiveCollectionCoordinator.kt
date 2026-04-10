@@ -31,6 +31,7 @@ import org.openlgx.roads.permission.ActivityRecognitionPermissionChecker
 import org.openlgx.roads.permission.FineLocationPermissionChecker
 import org.openlgx.roads.processing.calibration.SessionCalibrationHook
 import org.openlgx.roads.processing.ondevice.SessionProcessingScheduler
+import org.openlgx.roads.upload.SessionUploadScheduling
 import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.service.CollectorForegroundPresentation
 import org.openlgx.roads.service.CollectorForegroundPresentationRegistry
@@ -55,6 +56,7 @@ constructor(
     private val serviceStateRegistry: CollectorServiceStateRegistry,
     private val sessionCalibrationHook: SessionCalibrationHook,
     private val sessionProcessingScheduler: SessionProcessingScheduler,
+    private val sessionUploadScheduling: SessionUploadScheduling,
     private val foregroundPresentationRegistry: CollectorForegroundPresentationRegistry,
     private val recordingEventNotifier: RecordingEventNotifier,
     @ApplicationScope private val applicationScope: CoroutineScope,
@@ -167,6 +169,22 @@ constructor(
         }
 
         val settings = lastSettings ?: return
+
+        // If the process died (or the FGS was killed) before [finalizeCompletedSession] / interrupt paths
+        // ran, Room can still have an ACTIVE session with null [endedAtEpochMs] while this coordinator
+        // restarts idle with no [activeSessionId]. Close that row so the UI, exports, and processing
+        // backfill match reality.
+        if (activeSessionId == null &&
+            lifecycleState != CollectorLifecycleState.RECORDING &&
+            lifecycleState != CollectorLifecycleState.STOP_HOLD
+        ) {
+            val orphanId = recordingSessionRepository.findOpenSessionId()
+            if (orphanId != null) {
+                finalizeOrphanOpenSessionInDb(settings, orphanId)
+                return
+            }
+        }
+
         val snap = activityRecognitionGateway.snapshot.value
         val perm = permissionChecker.isGranted()
         val passive = settings.passiveCollectionEffective
@@ -470,6 +488,36 @@ constructor(
         publishUi()
     }
 
+    private suspend fun finalizeOrphanOpenSessionInDb(
+        settings: AppSettings,
+        orphanId: Long,
+    ) {
+        Timber.i("Finalizing orphan open session %s (process restart before in-memory finalize)", orphanId)
+        cancelDeferredJobs()
+        locationRecordingController.stopAndFlush()
+        sensorRecordingController.stopAndFlush()
+        val endedAt = System.currentTimeMillis()
+        recordingSessionRepository.endRecordingSession(
+            sessionId = orphanId,
+            endedAtEpochMs = endedAt,
+            endState = SessionState.COMPLETED,
+        )
+        sessionCalibrationHook.onRecordingSessionEnded(
+            sessionId = orphanId,
+            endState = SessionState.COMPLETED,
+            endedAtEpochMs = endedAt,
+            calibrationWorkflowEnabled = settings.calibrationWorkflowEnabled,
+        )
+        if (settings.processingLiveAfterSessionEnabled) {
+            sessionProcessingScheduler.onSessionRecordingCompleted(orphanId)
+        }
+        sessionUploadScheduling.scheduleAfterSessionCompleted(orphanId, settings)
+        recordingEventNotifier.notifyRecordingStopped(orphanId, SessionState.COMPLETED.name)
+        appSettingsRepository.recordRecordingStoppedAt(endedAt)
+        foregroundServiceController.stopCollectorService()
+        publishUi()
+    }
+
     private suspend fun finalizeCompletedSession() {
         if (lifecycleState != CollectorLifecycleState.STOP_HOLD) return
         if (lastSettings == null) return
@@ -496,6 +544,7 @@ constructor(
             if (lastSettings!!.processingLiveAfterSessionEnabled) {
                 sessionProcessingScheduler.onSessionRecordingCompleted(sid)
             }
+            sessionUploadScheduling.scheduleAfterSessionCompleted(sid, lastSettings!!)
             recordingEventNotifier.notifyRecordingStopped(sid, SessionState.COMPLETED.name)
             appSettingsRepository.recordRecordingStoppedAt(endedAt)
         }

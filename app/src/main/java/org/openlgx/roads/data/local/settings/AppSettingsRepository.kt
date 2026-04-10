@@ -59,4 +59,32 @@ interface AppSettingsRepository {
     suspend fun recordRecordingStartedAt(epochMs: Long = System.currentTimeMillis())
 
     suspend fun recordRecordingStoppedAt(epochMs: Long = System.currentTimeMillis())
+
+    suspend fun setUploadEnabled(enabled: Boolean)
+
+    suspend fun setUploadBaseUrl(url: String)
+
+    suspend fun setUploadApiKey(key: String)
+
+    suspend fun setUploadRetryLimit(limit: Int)
+
+    suspend fun setUploadAutoAfterSessionEnabled(enabled: Boolean)
+
+    suspend fun setUploadRoadFilterEnabled(enabled: Boolean)
+
+    suspend fun setUploadRoadFilterDistanceMeters(meters: Float)
+
+    suspend fun setUploadRoadFilterUnknownPolicy(policy: UploadRoadFilterUnknownPolicy)
+
+    suspend fun setUploadRoadPackRequiredForAutoUpload(required: Boolean)
+
+    suspend fun setUploadCouncilSlug(slug: String)
+
+    suspend fun setUploadProjectSlug(slug: String)
+
+    suspend fun setUploadProjectId(id: String)
+
+    suspend fun setUploadDeviceId(id: String)
+
+    suspend fun setUploadChargingPreferred(preferred: Boolean)
 }

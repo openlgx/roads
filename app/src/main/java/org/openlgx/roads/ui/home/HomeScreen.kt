@@ -742,7 +742,7 @@ private fun latestTripProcessingReadiness(
             Triple(
                 HomeReadinessKind.NeedsWork,
                 "Latest trip — roughness not ready yet (trip #${latest.id})",
-                "Open Recorded sessions once so on-device analysis can run, or wait after your next drive.",
+                "Analysis queues automatically; wait a few seconds on Home, or open Recorded sessions for maps and charts.",
             )
         }
         SessionProcessingState.RUNNING -> {

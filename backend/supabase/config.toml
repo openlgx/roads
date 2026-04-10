@@ -1,0 +1,8 @@
+# Supabase CLI — run `supabase link` from `backend/supabase` with your project ref.
+# Do not commit secrets; use Dashboard or `supabase secrets set`.
+
+[api]
+enabled = true
+
+[functions]
+verify_jwt = false
