@@ -43,6 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -331,6 +334,37 @@ fun HomeScreen(
                         subtitle = listeningSubtitle,
                         kind = listeningKind,
                     )
+
+                    HomeReadinessRow(
+                        title = "Battery optimization",
+                        subtitle =
+                            if (state.batteryOptimizationExempt) {
+                                "Exempt — the OS is less likely to throttle passive wakeups."
+                            } else {
+                                "Not exempt — OEMs may delay passive trip start until you open the app. " +
+                                    "Request exemption below (recommended)."
+                            },
+                        kind =
+                            if (state.batteryOptimizationExempt) {
+                                HomeReadinessKind.Ok
+                            } else {
+                                HomeReadinessKind.NeedsWork
+                            },
+                    )
+                    if (!state.batteryOptimizationExempt && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        OutlinedButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    },
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Request battery optimization exemption")
+                        }
+                    }
 
                     HomeReadinessRow(
                         title = "Ready to capture trips",

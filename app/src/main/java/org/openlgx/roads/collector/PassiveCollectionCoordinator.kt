@@ -659,7 +659,11 @@ constructor(
                 false -> false
                 null -> updatesActive && snap.likelyInVehicle && passive && perm && arOk
             }
-        val label = ActivityRecognitionLabels.forType(snap.lastDetectedActivityType)
+        val transitionLabel =
+            ActivityRecognitionLabels.forActivityAndTransition(
+                snap.lastDetectedActivityType,
+                snap.lastActivityTransitionType,
+            )
         val sid = activeSessionId
         val pres =
             when (lifecycleState) {
@@ -697,8 +701,7 @@ constructor(
                 activityRecognitionPermissionGranted = perm,
                 fineLocationPermissionGranted = fineLoc,
                 lastActivityType = snap.lastDetectedActivityType,
-                lastActivityConfidence = snap.lastConfidence,
-                lastActivityLabel = label,
+                lastActivityTransitionLabel = transitionLabel,
                 recordingActive =
                     recording ||
                         lifecycleState == CollectorLifecycleState.STOP_HOLD,
@@ -718,7 +721,7 @@ constructor(
             JSONObject().apply {
                 put("collectorLifecycle", state.name)
                 put("activityType", snap.lastDetectedActivityType)
-                put("confidence", snap.lastConfidence)
+                put("activityTransitionType", snap.lastActivityTransitionType)
                 put("updatesActive", snap.updatesActive)
                 if (debugNote != null) {
                     put("note", debugNote)

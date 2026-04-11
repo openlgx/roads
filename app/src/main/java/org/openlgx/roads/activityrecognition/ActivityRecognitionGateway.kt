@@ -10,10 +10,15 @@ data class ActivityRecognitionSnapshot(
     val lastErrorMessage: String?,
     val likelyInVehicle: Boolean,
     val lastDetectedActivityType: Int,
-    val lastConfidence: Int,
+    /**
+     * Last Activity Transition type (ENTER / EXIT from Play services), or [TRANSITION_UNKNOWN] before any event.
+     */
+    val lastActivityTransitionType: Int,
     val lastUpdateEpochMs: Long?,
 ) {
     companion object {
+        const val TRANSITION_UNKNOWN: Int = -1
+
         fun unavailable(reason: String?): ActivityRecognitionSnapshot =
             ActivityRecognitionSnapshot(
                 playServicesAvailable = false,
@@ -21,7 +26,7 @@ data class ActivityRecognitionSnapshot(
                 lastErrorMessage = reason,
                 likelyInVehicle = false,
                 lastDetectedActivityType = DetectedActivity.UNKNOWN,
-                lastConfidence = 0,
+                lastActivityTransitionType = TRANSITION_UNKNOWN,
                 lastUpdateEpochMs = null,
             )
 
@@ -32,7 +37,7 @@ data class ActivityRecognitionSnapshot(
                 lastErrorMessage = null,
                 likelyInVehicle = false,
                 lastDetectedActivityType = DetectedActivity.UNKNOWN,
-                lastConfidence = 0,
+                lastActivityTransitionType = TRANSITION_UNKNOWN,
                 lastUpdateEpochMs = null,
             )
     }
@@ -42,8 +47,8 @@ interface ActivityRecognitionGateway {
     val snapshot: StateFlow<ActivityRecognitionSnapshot>
 
     /**
-     * Applies an Activity Recognition result delivered to the manifest receiver (or any [Intent]
-     * carrying [com.google.android.gms.location.ActivityRecognitionResult]). Returns true if a
+     * Applies Activity Transition results delivered to the manifest receiver (or any [Intent]
+     * carrying [com.google.android.gms.location.ActivityTransitionResult]). Returns true if a
      * result was applied.
      */
     fun ingestActivityRecognitionIntent(intent: Intent): Boolean

@@ -21,6 +21,9 @@ data class CollectorRuntimeDiagnostics(
     val activityRecognitionPermissionGranted: Boolean,
     val activityRecognitionUpdatesActive: Boolean,
     val likelyInVehicle: Boolean,
+    /** Last Activity Transition API label, e.g. "In vehicle · enter". */
+    val lastActivityTransitionSummary: String,
+    val batteryOptimizationExempt: Boolean,
     val foregroundServiceRunning: Boolean,
     val openRecordingSessionId: Long?,
     val fineLocationPermissionGranted: Boolean,

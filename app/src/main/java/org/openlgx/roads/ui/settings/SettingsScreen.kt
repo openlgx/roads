@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,6 +37,8 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val hostedDiag by viewModel.hostedDiagnostics.collectAsStateWithLifecycle()
+    val batteryExempt by viewModel.batteryOptimizationExempt.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -72,6 +75,26 @@ fun SettingsScreen(
             Text("Onboarding", style = MaterialTheme.typography.titleMedium)
             Button(onClick = viewModel::completeOnboarding) {
                 Text("Mark onboarding complete (demo gate)")
+            }
+
+            Text("Battery & background", style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (batteryExempt) {
+                    "Battery optimization: exempt (recommended). Passive detection and WorkManager keepalive " +
+                        "are less likely to be delayed by the OS."
+                } else {
+                    "Battery optimization: not exempt — OEMs (e.g. Samsung) may delay passive trip start " +
+                        "until you open the app. Request exemption for reliable automatic trips."
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (!batteryExempt) {
+                Button(
+                    onClick = { context.startActivity(viewModel.batteryOptimizationExemptionIntent()) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Request battery optimization exemption")
+                }
             }
 
             Text("Upload policy", style = MaterialTheme.typography.titleMedium)

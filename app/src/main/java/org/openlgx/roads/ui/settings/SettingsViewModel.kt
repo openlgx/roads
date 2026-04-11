@@ -1,14 +1,20 @@
 package org.openlgx.roads.ui.settings
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.URI
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.openlgx.roads.data.local.db.RoadsDatabase
@@ -17,6 +23,7 @@ import org.openlgx.roads.data.local.settings.AppSettingsRepository
 import org.openlgx.roads.data.local.settings.CaptureSettingsPreset
 import org.openlgx.roads.data.local.settings.UploadRoadFilterUnknownPolicy
 import org.openlgx.roads.roadpack.RoadPackManager
+import org.openlgx.roads.permission.BatteryOptimizationChecker
 import javax.inject.Inject
 
 @HiltViewModel
@@ -26,7 +33,24 @@ constructor(
     private val appSettingsRepository: AppSettingsRepository,
     private val roadsDatabase: RoadsDatabase,
     private val roadPackManager: RoadPackManager,
+    private val batteryOptimizationChecker: BatteryOptimizationChecker,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
+
+    /** Exempt from battery optimization — recommended for passive trip detection. */
+    val batteryOptimizationExempt: StateFlow<Boolean> =
+        appSettingsRepository.settings
+            .map { batteryOptimizationChecker.isExempt() }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = batteryOptimizationChecker.isExempt(),
+            )
+
+    fun batteryOptimizationExemptionIntent(): Intent =
+        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:${context.packageName}")
+        }
 
     val settings: StateFlow<AppSettings> =
         appSettingsRepository.settings.stateIn(

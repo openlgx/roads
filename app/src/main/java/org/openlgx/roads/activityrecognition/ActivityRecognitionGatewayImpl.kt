@@ -8,7 +8,10 @@ import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityRecognitionClient
-import com.google.android.gms.location.ActivityRecognitionResult
+import com.google.android.gms.location.ActivityTransition
+import com.google.android.gms.location.ActivityTransitionEvent
+import com.google.android.gms.location.ActivityTransitionRequest
+import com.google.android.gms.location.ActivityTransitionResult
 import com.google.android.gms.location.DetectedActivity
 import com.google.android.gms.tasks.Tasks
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -42,9 +45,12 @@ constructor(
     }
 
     override fun ingestActivityRecognitionIntent(intent: Intent): Boolean {
-        if (!ActivityRecognitionResult.hasResult(intent)) return false
-        val result = ActivityRecognitionResult.extractResult(intent) ?: return false
-        applyDetected(result.mostProbableActivity, markUpdatesActive = true)
+        if (!ActivityTransitionResult.hasResult(intent)) return false
+        val result = ActivityTransitionResult.extractResult(intent) ?: return false
+        val events = result.transitionEvents
+        if (events.isEmpty()) return false
+        val last = events.last()
+        applyTransitionEvent(last, markUpdatesActive = true)
         return true
     }
 
@@ -55,7 +61,8 @@ constructor(
         try {
             val pi = pendingIntentForUpdates()
             pendingIntent = pi
-            Tasks.await(recognitionClient.requestActivityUpdates(UPDATE_INTERVAL_MS, pi))
+            val request = ActivityTransitionRequest(buildActivityTransitions())
+            Tasks.await(recognitionClient.requestActivityTransitionUpdates(request, pi))
             _snapshot.value =
                 _snapshot.value.copy(
                     playServicesAvailable = true,
@@ -83,7 +90,7 @@ constructor(
         val pi = pendingIntent
         if (pi != null) {
             try {
-                Tasks.await(recognitionClient.removeActivityUpdates(pi))
+                Tasks.await(recognitionClient.removeActivityTransitionUpdates(pi))
             } catch (_: Throwable) {
                 // Best-effort cleanup; PendingIntent may already be unregistered.
             }
@@ -95,7 +102,7 @@ constructor(
                 lastErrorMessage = null,
                 likelyInVehicle = false,
                 lastDetectedActivityType = DetectedActivity.UNKNOWN,
-                lastConfidence = 0,
+                lastActivityTransitionType = ActivityRecognitionSnapshot.TRANSITION_UNKNOWN,
                 lastUpdateEpochMs = null,
             )
     }
@@ -130,24 +137,56 @@ constructor(
         pi?.cancel()
     }
 
-    private fun applyDetected(activity: DetectedActivity, markUpdatesActive: Boolean) {
-        val inVehicle =
-            activity.type == DetectedActivity.IN_VEHICLE && activity.confidence >= LIKELY_VEHICLE_CONFIDENCE
+    private fun applyTransitionEvent(event: ActivityTransitionEvent, markUpdatesActive: Boolean) {
+        val activityType = event.activityType
+        val transitionType = event.transitionType
         val now = System.currentTimeMillis()
+
+        val likelyInVehicle =
+            when {
+                activityType == DetectedActivity.IN_VEHICLE &&
+                    transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER -> true
+                activityType == DetectedActivity.IN_VEHICLE &&
+                    transitionType == ActivityTransition.ACTIVITY_TRANSITION_EXIT -> false
+                activityType == DetectedActivity.ON_FOOT &&
+                    transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER -> false
+                activityType == DetectedActivity.STILL &&
+                    transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER -> false
+                else -> _snapshot.value.likelyInVehicle
+            }
+
         _snapshot.value =
             _snapshot.value.copy(
                 playServicesAvailable = true,
                 updatesActive = markUpdatesActive || _snapshot.value.updatesActive,
-                likelyInVehicle = inVehicle,
-                lastDetectedActivityType = activity.type,
-                lastConfidence = activity.confidence,
+                likelyInVehicle = likelyInVehicle,
+                lastDetectedActivityType = activityType,
+                lastActivityTransitionType = transitionType,
                 lastUpdateEpochMs = now,
             )
     }
 
+    private fun buildActivityTransitions(): List<ActivityTransition> =
+        listOf(
+            ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.IN_VEHICLE)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                .build(),
+            ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.IN_VEHICLE)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
+                .build(),
+            ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.ON_FOOT)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                .build(),
+            ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.STILL)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                .build(),
+        )
+
     private companion object {
-        const val UPDATE_INTERVAL_MS: Long = 10_000L
         const val REQUEST_CODE: Int = 0xAC71
-        const val LIKELY_VEHICLE_CONFIDENCE: Int = 50
     }
 }

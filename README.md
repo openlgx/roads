@@ -59,12 +59,13 @@ While the collector is **RECORDING** and the `CollectorForegroundService` is run
 
 **Passive collection when the app is not in the foreground**
 
-- **Activity recognition** results are delivered to a **manifest-registered** receiver (`ActivityRecognitionUpdatesReceiver`), not only a dynamically registered one, so the process can be started or woken when Google Play Services has an update (for example after the task was removed from recents and the OS had killed the app).
+- **Activity Transition API** (Play services): the app uses **`requestActivityTransitionUpdates`** (IN_VEHICLE enter/exit, ON_FOOT/STILL enter) delivered to a **manifest-registered** receiver (`ActivityRecognitionUpdatesReceiver`), which **always calls `PassiveCollectionHandle.start()`** before ingesting intents so the coordinator mailbox runs after a **cold process start**.
+- **Keepalive**: **`PassiveKeepaliveWorker`** runs on a **15-minute** WorkManager cadence (`passive_keepalive`) and calls `start()` so Activity Recognition is **re-registered** after OEM idle kills. Scheduled from `RoadsApplication.onCreate`, **`BootCompletedReceiver`**, and **`AppUpdatedReceiver`** (`MY_PACKAGE_REPLACED`).
 - **Device reboot**: `BootCompletedReceiver` handles `BOOT_COMPLETED` (with `RECEIVE_BOOT_COMPLETED`) so `RoadsApplication` / `PassiveCollectionHandle.start()` runs again and the coordinator can re-subscribe when passive collection is enabled.
 - **While recording**: Trip capture still relies on **`CollectorForegroundService`** (location-type FGS); users should see an ongoing notification during recording.
 - **Process death before finalize**: If the app process is killed before the coordinator closes the Room row (crash, OOM, aggressive OEM kill), the session can remain **`ACTIVE`** with **`endedAtEpochMs` null** while Home shows **Idle**. On the next reconcile after restart, the coordinator **finalizes that orphan as `COMPLETED`** and schedules processing so backfill and the session list stay consistent.
 - **Force stop** (Settings → Apps → *Force stop*): Android **does not** allow the app to restart background components until the user launches the app again. This is platform policy—not something the app can override.
-- **OEM battery restrictions**: For best results on aggressive devices, set the app’s battery usage to **Unrestricted** (wording varies by manufacturer).
+- **OEM battery restrictions**: For best results on aggressive devices, set the app’s battery usage to **Unrestricted** (wording varies by manufacturer). Home and Settings expose **battery optimization exemption** (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) when not already exempt.
 
 **Phase 2C (session inspection, local export, validation tooling)**
 

@@ -3,6 +3,7 @@ package org.openlgx.roads.collector
 import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
+import com.google.android.gms.location.ActivityTransition
 import com.google.android.gms.location.DetectedActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -118,7 +119,7 @@ class PassiveCollectionCoordinatorTest {
                     lastErrorMessage = null,
                     likelyInVehicle = true,
                     lastDetectedActivityType = DetectedActivity.IN_VEHICLE,
-                    lastConfidence = 60,
+                    lastActivityTransitionType = ActivityTransition.ACTIVITY_TRANSITION_ENTER,
                     lastUpdateEpochMs = 1L,
                 )
             val gateway = FakeActivityGateway(MutableStateFlow(drivingSnap))
@@ -185,7 +186,7 @@ class PassiveCollectionCoordinatorTest {
                     lastErrorMessage = null,
                     likelyInVehicle = true,
                     lastDetectedActivityType = DetectedActivity.IN_VEHICLE,
-                    lastConfidence = 60,
+                    lastActivityTransitionType = ActivityTransition.ACTIVITY_TRANSITION_ENTER,
                     lastUpdateEpochMs = 1L,
                 )
             val gateway = FakeActivityGateway(MutableStateFlow(drivingSnap))

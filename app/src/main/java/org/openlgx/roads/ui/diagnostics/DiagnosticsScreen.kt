@@ -130,6 +130,15 @@ fun DiagnosticsScreen(
                         "Activity recognition permission granted: ${snap.collectorRuntime.activityRecognitionPermissionGranted}",
                     )
                     Text("Activity recognition updates active: ${snap.collectorRuntime.activityRecognitionUpdatesActive}")
+                    Text(
+                        "Last activity transition: ${snap.collectorRuntime.lastActivityTransitionSummary}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        "Battery optimization exempt: ${snap.collectorRuntime.batteryOptimizationExempt} " +
+                            "(recommended for passive detection on OEMs)",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     Text("Likely in vehicle (UI model): ${snap.collectorRuntime.likelyInVehicle}")
                     Text("Foreground service running: ${snap.collectorRuntime.foregroundServiceRunning}")
                     Text("Open recording session id (DB): ${snap.collectorRuntime.openRecordingSessionId ?: "—"}")

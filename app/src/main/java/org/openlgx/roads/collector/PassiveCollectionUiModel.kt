@@ -11,8 +11,8 @@ data class PassiveCollectionUiModel(
     val activityRecognitionPermissionGranted: Boolean = false,
     val fineLocationPermissionGranted: Boolean = false,
     val lastActivityType: Int = 0,
-    val lastActivityConfidence: Int = 0,
-    val lastActivityLabel: String = "—",
+    /** Last activity transition label, e.g. "In vehicle · enter" (Activity Transition API). */
+    val lastActivityTransitionLabel: String = "—",
     val recordingActive: Boolean = false,
     val activeSessionId: Long? = null,
     val foregroundServiceRunning: Boolean = false,

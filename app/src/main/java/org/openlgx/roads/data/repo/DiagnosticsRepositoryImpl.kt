@@ -13,6 +13,7 @@ import org.openlgx.roads.location.LocationRecordingController
 import org.openlgx.roads.permission.ActivityRecognitionPermissionChecker
 import org.openlgx.roads.sensor.SensorGateway
 import org.openlgx.roads.sensor.SensorRecordingController
+import org.openlgx.roads.permission.BatteryOptimizationChecker
 import org.openlgx.roads.permission.FineLocationPermissionChecker
 import org.openlgx.roads.service.CollectorServiceStateRegistry
 import org.openlgx.roads.export.ExportDiagnosticsRepository
@@ -30,6 +31,7 @@ constructor(
     private val passiveCollection: PassiveCollectionHandle,
     private val activityRecognitionPermissionChecker: ActivityRecognitionPermissionChecker,
     private val fineLocationPermissionChecker: FineLocationPermissionChecker,
+    private val batteryOptimizationChecker: BatteryOptimizationChecker,
     private val locationRecordingController: LocationRecordingController,
     private val sensorGateway: SensorGateway,
     private val sensorRecordingController: SensorRecordingController,
@@ -85,6 +87,8 @@ constructor(
                     activityRecognitionPermissionChecker.isGranted(),
                 activityRecognitionUpdatesActive = collectorUi.activityRecognitionUpdatesActive,
                 likelyInVehicle = collectorUi.likelyInVehicle,
+                lastActivityTransitionSummary = collectorUi.lastActivityTransitionLabel,
+                batteryOptimizationExempt = batteryOptimizationChecker.isExempt(),
                 foregroundServiceRunning =
                     collectorServiceStateRegistry.foregroundRunning.value,
                 openRecordingSessionId = openSessionId,

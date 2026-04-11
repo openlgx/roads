@@ -103,6 +103,7 @@ Still to harden:
 - more lifecycle edge-case tests
 - review UX polish under larger datasets
 - clearer docs for field protocol
+- **Passive cold-start (implemented):** Activity Transition API + manifest receiver bootstraps coordinator; WorkManager keepalive (15 min); `MY_PACKAGE_REPLACED` receiver; battery optimization prompt — see README *Passive collection when the app is not in the foreground*.
 
 Exit criteria:
 - one real trip consistently stays one session

@@ -8,6 +8,7 @@ import org.openlgx.roads.BuildConfig
 import org.openlgx.roads.debug.AgentDebugLog
 import org.openlgx.roads.di.HiltWorkerFactoryEntryPoint
 import org.openlgx.roads.di.PassiveCollectionEntryPoint
+import org.openlgx.roads.di.PassiveKeepaliveEntryPoint
 import org.openlgx.roads.di.PilotBootstrapEntryPoint
 import timber.log.Timber
 
@@ -64,5 +65,9 @@ class RoadsApplication : Application(), Configuration.Provider {
         EntryPointAccessors.fromApplication(this, PassiveCollectionEntryPoint::class.java)
             .passiveCollectionHandle()
             .start()
+
+        EntryPointAccessors.fromApplication(this, PassiveKeepaliveEntryPoint::class.java)
+            .passiveKeepaliveScheduler()
+            .ensureScheduled()
     }
 }

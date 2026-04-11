@@ -1,5 +1,6 @@
 package org.openlgx.roads.ui.home
 
+import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -21,10 +22,19 @@ import org.openlgx.roads.location.LocationRecordingController
 import org.openlgx.roads.location.LocationRecordingUiState
 import org.openlgx.roads.sensor.SensorAvailabilitySnapshot
 import org.openlgx.roads.processing.ondevice.SessionProcessingScheduler
+import org.openlgx.roads.permission.BatteryOptimizationChecker
 import org.openlgx.roads.sensor.SensorRecordingController
 import org.openlgx.roads.sensor.SensorRecordingUiState
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
 class HomeViewModelTest {
+
+    private fun batteryChecker(): BatteryOptimizationChecker =
+        BatteryOptimizationChecker(ApplicationProvider.getApplicationContext())
 
     private object NoOpSessionProcessingScheduler : SessionProcessingScheduler {
         override fun onSessionRecordingCompleted(sessionId: Long) = Unit
@@ -72,6 +82,7 @@ class HomeViewModelTest {
             val vm =
                 HomeViewModel(
                     repo,
+                    batteryChecker(),
                     collector,
                     location,
                     sensor,
@@ -117,6 +128,7 @@ class HomeViewModelTest {
             val vm =
                 HomeViewModel(
                     repo,
+                    batteryChecker(),
                     collector,
                     location,
                     sensor,
@@ -182,6 +194,7 @@ class HomeViewModelTest {
             val vm =
                 HomeViewModel(
                     repo,
+                    batteryChecker(),
                     collector,
                     location,
                     sensor,

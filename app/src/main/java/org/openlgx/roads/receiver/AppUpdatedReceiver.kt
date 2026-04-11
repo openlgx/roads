@@ -9,13 +9,12 @@ import org.openlgx.roads.di.PassiveCollectionEntryPoint
 import org.openlgx.roads.di.PassiveKeepaliveEntryPoint
 
 /**
- * Uses an entry point so this receiver never depends on Hilt field injection (avoids lateinit crashes
- * if the receiver runs in an unusual process/ordering path).
+ * After an app update, re-bootstrap passive collection and keepalive (same as cold start).
  */
-class BootCompletedReceiver : BroadcastReceiver() {
+class AppUpdatedReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent?) {
-        if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
+        if (intent?.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         val app = context.applicationContext as Application
         EntryPointAccessors.fromApplication(app, PassiveCollectionEntryPoint::class.java)
             .passiveCollectionHandle()

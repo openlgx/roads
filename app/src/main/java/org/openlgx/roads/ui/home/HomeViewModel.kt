@@ -14,6 +14,7 @@ import org.openlgx.roads.collector.PassiveCollectionUiModel
 import org.openlgx.roads.data.local.db.model.SessionListStats
 import org.openlgx.roads.data.local.settings.AppSettings
 import org.openlgx.roads.data.local.settings.AppSettingsRepository
+import org.openlgx.roads.permission.BatteryOptimizationChecker
 import org.openlgx.roads.data.repo.RecordingSessionRepository
 import org.openlgx.roads.data.repo.session.SessionInspectionRepository
 import org.openlgx.roads.location.LocationRecordingController
@@ -46,6 +47,8 @@ data class HomeUiState(
     val latestSessionSummary: SessionListStats? = null,
     val lastRecordingStartedAtEpochMs: Long? = null,
     val lastRecordingStoppedAtEpochMs: Long? = null,
+    /** True when battery optimization is disabled for this app (recommended for passive detection). */
+    val batteryOptimizationExempt: Boolean = true,
 )
 
 @HiltViewModel
@@ -53,6 +56,7 @@ class HomeViewModel
 @Inject
 constructor(
     private val appSettingsRepository: AppSettingsRepository,
+    private val batteryOptimizationChecker: BatteryOptimizationChecker,
     private val passiveCollection: PassiveCollectionHandle,
     locationRecordingController: LocationRecordingController,
     sensorRecordingController: SensorRecordingController,
@@ -96,6 +100,7 @@ constructor(
                 latestSessionSummary = sessionRows.firstOrNull(),
                 lastRecordingStartedAtEpochMs = settings.lastRecordingStartedAtEpochMs,
                 lastRecordingStoppedAtEpochMs = settings.lastRecordingStoppedAtEpochMs,
+                batteryOptimizationExempt = batteryOptimizationChecker.isExempt(),
             )
         }.stateIn(
             scope = viewModelScope,
