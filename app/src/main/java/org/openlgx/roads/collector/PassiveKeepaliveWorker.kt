@@ -24,9 +24,10 @@ constructor(
 
     override suspend fun doWork(): Result {
         val app = applicationContext as Application
-        EntryPointAccessors.fromApplication(app, PassiveCollectionEntryPoint::class.java)
+        val handle = EntryPointAccessors.fromApplication(app, PassiveCollectionEntryPoint::class.java)
             .passiveCollectionHandle()
-            .start()
+        handle.start()
+        handle.nudge()
         return Result.success()
     }
 }

@@ -146,4 +146,12 @@ object RoadsDatabaseMigrations {
                 db.execSQL("ALTER TABLE upload_batches ADD COLUMN uploadSkipReason TEXT")
             }
         }
+
+    val MIGRATION_6_7: Migration =
+        object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE upload_batches ADD COLUMN contentChecksumSha256 TEXT")
+                db.execSQL("ALTER TABLE upload_batches ADD COLUMN artifactKind TEXT")
+            }
+        }
 }

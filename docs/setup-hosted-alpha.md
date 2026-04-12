@@ -63,6 +63,19 @@ See **`backend/.env.example`** (repo template; copy to gitignored `backend/.env.
 
 Create private buckets matching env names (e.g. `roads-alpha-raw`, `roads-alpha-published`). Configure **RLS/policies** so **only service role** used by Edge Functions can create signed URLs; clients never use anon key for raw upload.
 
+### Storage size limit vs Edge `uploads-create`
+
+`uploads-create` validates `byteSize` in the Edge Function, but the device **PUT** goes to **Supabase Storage**, which enforces its own **[global file size limit](https://supabase.com/docs/guides/storage/uploads/file-limits)**:
+
+| Supabase plan | Max single-object size (global Storage setting) |
+|---------------|--------------------------------------------------|
+| **Free** | **Cannot exceed 50 MiB** (hard cap for the project) |
+| **Pro / Team / Enterprise** | Can raise the global limit (up to **500 GB** on Pro/Team) in **Dashboard → Storage → Settings** |
+
+If `uploads-create` returns **200** but the app fails with **`413 Payload too large`** / `The object exceeded the maximum allowed size` on **PUT**, the ZIP is larger than **Storage’s** limit, not the Edge validator. **Upgrade the Supabase plan** (or accept ≤50 MiB exports on Free), then raise **Storage → global file size limit** to match your expected session ZIP size (e.g. 1–2 GiB for sensor-heavy trips).
+
+If **`uploads-create` returns 500** with `storage_error` / **"The resource already exists"**, a leftover object at the same Storage key (failed prior upload or retry) blocked minting a new signed URL. The Edge function **removes** that key with the service role before signing; **redeploy `uploads-create`** if you still see this on an older deploy.
+
 ---
 
 ## API keys (`api_keys` table)

@@ -9,7 +9,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -27,7 +29,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.util.Locale
 import org.openlgx.roads.data.local.settings.CaptureSettingsPreset
+import org.openlgx.roads.upload.SessionUploadProgressKeys
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +41,8 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val hostedDiag by viewModel.hostedDiagnostics.collectAsStateWithLifecycle()
+    val backfillResult by viewModel.backfillResult.collectAsStateWithLifecycle()
+    val hostedUploadTransferProgress by viewModel.hostedUploadTransferProgress.collectAsStateWithLifecycle()
     val batteryExempt by viewModel.batteryOptimizationExempt.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -271,6 +277,81 @@ fun SettingsScreen(
                 "Upload queue (pending/retryable rows): ${hostedDiag.uploadQueuePendingOrRetryable}",
                 style = MaterialTheme.typography.bodySmall,
             )
+            OutlinedButton(
+                onClick = { viewModel.backfillPendingHostedUploads() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Backfill un-uploaded sessions")
+            }
+            hostedUploadTransferProgress?.let { p ->
+                val mbUp = p.bytesUploaded / 1_000_000.0
+                val mbTot = p.bytesTotal / 1_000_000.0
+                when {
+                    p.phase == SessionUploadProgressKeys.PHASE_PREPARE &&
+                        p.prepareRowsTotal > 0L -> {
+                        val frac =
+                            (p.prepareRowsDone.toFloat() / p.prepareRowsTotal.toFloat())
+                                .coerceIn(0f, 1f)
+                        LinearProgressIndicator(
+                            progress = { frac },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                        )
+                        Text(
+                            "Session ${p.sessionIdLocal}: Preparing ZIP — " +
+                                "${p.prepareRowsDone} / ${p.prepareRowsTotal} rows (export)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    p.phase == SessionUploadProgressKeys.PHASE_UPLOAD && p.bytesTotal > 0L -> {
+                        val frac =
+                            (p.bytesUploaded.toFloat() / p.bytesTotal.toFloat()).coerceIn(0f, 1f)
+                        LinearProgressIndicator(
+                            progress = { frac },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                        )
+                        Text(
+                            "Session ${p.sessionIdLocal}: " +
+                                String.format(Locale.US, "%.1f / %.1f MB", mbUp, mbTot),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    else -> {
+                        LinearProgressIndicator(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                        )
+                        p.statusLabel?.let { label ->
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                    }
+                }
+            }
+            Text(
+                "Queues completed trips whose hosted state is NOT_STARTED, FAILED, UPLOAD_SKIPPED, or UPLOADING " +
+                    "(same Wi‑Fi/charging rules as auto-upload).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            backfillResult?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
             Text(
                 "Last upload attempt (epoch ms): ${hostedDiag.uploadLastAttemptAtEpochMs ?: "—"}",
                 style = MaterialTheme.typography.bodySmall,

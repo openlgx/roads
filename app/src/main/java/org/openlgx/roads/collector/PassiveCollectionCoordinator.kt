@@ -68,6 +68,7 @@ constructor(
     private var armingStartedAtEpochMs: Long? = null
     private var activeSessionId: Long? = null
     private var armingJob: Job? = null
+    private var armingRetryJob: Job? = null
     private var stopHoldTimeoutJob: Job? = null
     private var debugDrivingOverride: Boolean? = null
 
@@ -121,6 +122,10 @@ constructor(
             }
         }
 
+        mailbox.trySend(Unit)
+    }
+
+    override fun nudge() {
         mailbox.trySend(Unit)
     }
 
@@ -379,6 +384,8 @@ constructor(
         lifecycleState = CollectorLifecycleState.ARMING
         armingStartedAtEpochMs = System.currentTimeMillis()
         armingJob?.cancel()
+        armingRetryJob?.cancel()
+        armingRetryJob = null
         val debounce = armingDebounceMs(settings, snap)
         armingJob =
             applicationScope.launch {
@@ -414,10 +421,24 @@ constructor(
             }
         if (!gateOk) {
             lifecycleState = CollectorLifecycleState.IDLE
+            scheduleArmingRetry()
             publishUi()
             return
         }
         enterRecordingFromArming(settings)
+    }
+
+    /**
+     * After the GPS speed gate fails but AR still says IN_VEHICLE, schedule a delayed re-check.
+     * Play Services won't re-send IN_VEHICLE ENTER while we're already in a vehicle, so without
+     * this retry the coordinator would stay IDLE for the entire drive.
+     */
+    private fun scheduleArmingRetry() {
+        armingRetryJob?.cancel()
+        armingRetryJob = applicationScope.launch {
+            delay(ARMING_RETRY_DELAY_MS)
+            mailbox.trySend(Unit)
+        }
     }
 
     private suspend fun enterRecordingFromArming(settings: AppSettings) {
@@ -618,6 +639,8 @@ constructor(
     private fun cancelDeferredJobs() {
         armingJob?.cancel()
         armingJob = null
+        armingRetryJob?.cancel()
+        armingRetryJob = null
         cancelStopHoldTimeout()
         armingStartedAtEpochMs = null
         lowMovementSinceEpochMs = null
@@ -734,5 +757,7 @@ constructor(
         const val FAST_ARMING_DEBOUNCE_MS: Long = 500L
         const val NORMAL_ARMING_DEBOUNCE_MS: Long = 1_600L
         const val LOW_MOVEMENT_ENTER_STOP_HOLD_MS: Long = 12_000L
+        /** Re-check GPS speed after arming gate fails while AR still says IN_VEHICLE. */
+        const val ARMING_RETRY_DELAY_MS: Long = 10_000L
     }
 }

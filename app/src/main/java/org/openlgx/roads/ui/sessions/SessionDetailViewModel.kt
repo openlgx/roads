@@ -17,6 +17,7 @@ import org.openlgx.roads.export.SessionExporter
 import org.openlgx.roads.processing.ondevice.SessionProcessingScheduler
 import org.openlgx.roads.upload.HostedPipelineDisplayMapper
 import org.openlgx.roads.upload.HostedPipelineDisplayState
+import org.openlgx.roads.upload.SessionUploadScheduling
 
 @HiltViewModel
 class SessionDetailViewModel
@@ -26,6 +27,7 @@ constructor(
     private val sessionExporter: SessionExporter,
     private val sessionProcessingScheduler: SessionProcessingScheduler,
     private val appSettingsRepository: AppSettingsRepository,
+    private val sessionUploadScheduling: SessionUploadScheduling,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -43,6 +45,9 @@ constructor(
 
     private val _reprocessMessage = MutableStateFlow<String?>(null)
     val reprocessMessage: StateFlow<String?> = _reprocessMessage.asStateFlow()
+
+    private val _uploadMessage = MutableStateFlow<String?>(null)
+    val uploadMessage: StateFlow<String?> = _uploadMessage.asStateFlow()
 
     init {
         if (sessionId > 0) {
@@ -92,5 +97,20 @@ constructor(
         sessionProcessingScheduler.requestReprocess(sessionId)
         _reprocessMessage.value =
             "Reprocess requested. If processing is already running, this session will run again when it finishes."
+    }
+
+    /**
+     * Queues [org.openlgx.roads.upload.SessionUploadWorker] for this session (manual upload;
+     * bypasses the auto-after-session toggle).
+     */
+    fun uploadSessionToHosted() {
+        if (sessionId <= 0) return
+        viewModelScope.launch {
+            val settings = appSettingsRepository.settings.first()
+            val err = sessionUploadScheduling.enqueueSingleSession(sessionId, settings)
+            _uploadMessage.value =
+                err ?: "Upload queued. WorkManager will run when network/charging rules allow."
+            refresh()
+        }
     }
 }

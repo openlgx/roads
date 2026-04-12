@@ -22,7 +22,23 @@ type CreateBody = {
   contentChecksumSha256: string;
   mimeType: string;
   startedAtEpochMs?: number;
+  /**
+   * When set, this request is one part of a logical ZIP. Each part must be ≤ CHUNK_MAX_BYTES
+   * (under Supabase Free Storage 50 MiB). Object keys are `…/session.zip.part0000`, etc.
+   */
+  multipart?: {
+    groupId: string;
+    partIndex: number;
+    partTotal: number;
+    wholeFileBytes: number;
+    wholeFileChecksumSha256: string;
+  };
 };
+
+/** Max logical ZIP (sum of parts). Keep in sync with docs/api-contract.md. */
+const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024; // 1 GiB
+/** Per-part max: stay under Free tier Storage global limit (50 MiB). */
+const CHUNK_MAX_BYTES = 48 * 1024 * 1024; // 48 MiB
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -80,8 +96,54 @@ Deno.serve(async (req) => {
     ) {
       return errorResponse("bad_request", "Invalid artifactKind", 400);
     }
-    if (!body.mimeType || body.byteSize <= 0 || body.byteSize > 52_428_800) {
-      return errorResponse("bad_request", "Invalid size or mimeType", 400);
+
+    const mp = body.multipart;
+    if (mp) {
+      if (!isUuid(mp.groupId)) {
+        return errorResponse("bad_request", "Invalid multipart.groupId", 400);
+      }
+      if (
+        mp.partTotal < 1 || mp.partTotal > 4096 ||
+        mp.partIndex < 0 || mp.partIndex >= mp.partTotal
+      ) {
+        return errorResponse("bad_request", "Invalid multipart partIndex/partTotal", 400);
+      }
+      if (mp.wholeFileBytes <= 0 || mp.wholeFileBytes > MAX_UPLOAD_BYTES) {
+        return errorResponse("bad_request", "Invalid multipart.wholeFileBytes", 400);
+      }
+      if (!/^[a-f0-9]{64}$/i.test(mp.wholeFileChecksumSha256)) {
+        return errorResponse("bad_request", "Invalid multipart.wholeFileChecksumSha256", 400);
+      }
+      if (body.byteSize <= 0 || body.byteSize > CHUNK_MAX_BYTES) {
+        return errorResponse(
+          "bad_request",
+          `Each part must be 1..${CHUNK_MAX_BYTES} bytes (multipart chunk cap)`,
+          400,
+        );
+      }
+      const existing = await sql<
+        { whole_file_checksum_sha256: string | null; part_total: number | null }[]
+      >`
+        SELECT whole_file_checksum_sha256, part_total FROM upload_jobs
+        WHERE multipart_group_id = ${mp.groupId}::uuid LIMIT 1`;
+      const ex = existing[0];
+      if (ex) {
+        if (
+          (ex.whole_file_checksum_sha256 ?? "").toLowerCase() !==
+            mp.wholeFileChecksumSha256.toLowerCase() ||
+          Number(ex.part_total) !== mp.partTotal
+        ) {
+          return errorResponse("conflict", "multipart group metadata mismatch", 409);
+        }
+      }
+    } else {
+      if (!body.mimeType || body.byteSize <= 0 || body.byteSize > MAX_UPLOAD_BYTES) {
+        return errorResponse("bad_request", "Invalid size or mimeType", 400);
+      }
+    }
+
+    if (!body.mimeType) {
+      return errorResponse("bad_request", "mimeType required", 400);
     }
     if (!/^[a-f0-9]{64}$/i.test(body.contentChecksumSha256)) {
       return errorResponse(
@@ -116,7 +178,7 @@ Deno.serve(async (req) => {
       : new Date();
 
     const sessionUuid = body.clientSessionUuid.toLowerCase();
-    const objectKey = body.artifactKind === "FILTERED_UPLOAD"
+    const baseKey = body.artifactKind === "FILTERED_UPLOAD"
       ? filteredSessionZipKey({
         councilSlug,
         projectSlug: p.slug,
@@ -131,6 +193,9 @@ Deno.serve(async (req) => {
         startedAt,
         sessionUuid,
       });
+    const objectKey = mp
+      ? `${baseKey}.part${String(mp.partIndex).padStart(4, "0")}`
+      : baseKey;
 
     const bucket = requireRawBucket();
 
@@ -166,20 +231,74 @@ Deno.serve(async (req) => {
         WHERE id = ${recordingSessionId}::uuid`;
     }
 
-    const uj = await sql<{ id: string }[]>`
-      INSERT INTO upload_jobs (
-        recording_session_id, state, artifact_kind, object_key,
-        content_checksum_sha256, byte_size
-      ) VALUES (
-        ${recordingSessionId}::uuid,
-        'PENDING',
-        ${body.artifactKind},
-        ${objectKey},
-        ${body.contentChecksumSha256.toLowerCase()},
-        ${body.byteSize}
-      )
-      RETURNING id`;
-    const uploadJobId = uj[0].id;
+    let uploadJobId: string;
+    if (mp) {
+      const dup = await sql<
+        { id: string; content_checksum_sha256: string | null; byte_size: string | null }[]
+      >`
+        SELECT id, content_checksum_sha256, byte_size::text FROM upload_jobs
+        WHERE multipart_group_id = ${mp.groupId}::uuid AND part_index = ${mp.partIndex}
+        LIMIT 1`;
+      const d = dup[0];
+      if (d) {
+        if (
+          (d.content_checksum_sha256 ?? "").toLowerCase() !==
+            body.contentChecksumSha256.toLowerCase() ||
+          Number(d.byte_size) !== body.byteSize
+        ) {
+          return errorResponse(
+            "conflict",
+            "multipart part already exists with different payload",
+            409,
+          );
+        }
+        uploadJobId = d.id;
+      } else {
+        const uj = await sql<{ id: string }[]>`
+          INSERT INTO upload_jobs (
+            recording_session_id, state, artifact_kind, object_key,
+            content_checksum_sha256, byte_size,
+            multipart_group_id, part_index, part_total,
+            whole_file_checksum_sha256, whole_file_bytes
+          ) VALUES (
+            ${recordingSessionId}::uuid,
+            'PENDING',
+            ${body.artifactKind},
+            ${objectKey},
+            ${body.contentChecksumSha256.toLowerCase()},
+            ${body.byteSize},
+            ${mp.groupId}::uuid,
+            ${mp.partIndex},
+            ${mp.partTotal},
+            ${mp.wholeFileChecksumSha256.toLowerCase()},
+            ${mp.wholeFileBytes}
+          )
+          RETURNING id`;
+        uploadJobId = uj[0].id;
+      }
+    } else {
+      const uj = await sql<{ id: string }[]>`
+        INSERT INTO upload_jobs (
+          recording_session_id, state, artifact_kind, object_key,
+          content_checksum_sha256, byte_size,
+          multipart_group_id, part_index, part_total,
+          whole_file_checksum_sha256, whole_file_bytes
+        ) VALUES (
+          ${recordingSessionId}::uuid,
+          'PENDING',
+          ${body.artifactKind},
+          ${objectKey},
+          ${body.contentChecksumSha256.toLowerCase()},
+          ${body.byteSize},
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          NULL
+        )
+        RETURNING id`;
+      uploadJobId = uj[0].id;
+    }
 
     await sql`
       UPDATE recording_sessions SET upload_state = 'QUEUED', updated_at = now()
@@ -191,9 +310,16 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // `createSignedUploadUrl` returns "The resource already exists" if a prior PUT or
+    // failed attempt left an object at this key. Remove stale blob so retries / backfill work.
+    const rm = await supabase.storage.from(bucket).remove([objectKey]);
+    if (rm.error) {
+      console.warn("uploads-create: remove before sign (non-fatal):", rm.error.message);
+    }
+
     const { data: signData, error: signErr } = await supabase.storage
       .from(bucket)
-      .createSignedUploadUrl(objectKey);
+      .createSignedUploadUrl(objectKey, { upsert: true });
 
     if (signErr || !signData?.signedUrl) {
       console.error(signErr);
@@ -235,7 +361,10 @@ Deno.serve(async (req) => {
       signedUrlExpiresAt,
       expiresAt: signedUrlExpiresAt,
       maxBytes: body.byteSize,
-      multipart: false,
+      multipart: Boolean(mp),
+      multipartGroupId: mp?.groupId ?? null,
+      multipartPartIndex: mp?.partIndex ?? null,
+      multipartPartTotal: mp?.partTotal ?? null,
       checksumAlgorithm: "sha256",
       requiredHeaders: signedUploadHeaders,
     });

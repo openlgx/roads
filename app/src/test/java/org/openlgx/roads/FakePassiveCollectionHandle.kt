@@ -15,6 +15,8 @@ class FakePassiveCollectionHandle(
 
     override fun start() = Unit
 
+    override fun nudge() = Unit
+
     override fun debugSetSimulateDriving(active: Boolean?) = Unit
 
     override fun debugForceStartRecording() = Unit

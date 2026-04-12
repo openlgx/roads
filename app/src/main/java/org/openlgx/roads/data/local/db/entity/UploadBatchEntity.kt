@@ -40,4 +40,8 @@ data class UploadBatchEntity(
     val filterChangedPayload: Boolean = false,
     /** Populated when upload was not attempted ([BatchUploadState.SKIPPED]). */
     val uploadSkipReason: String? = null,
+    /** SHA-256 of the prepared ZIP; used to resume after WorkManager retry without re-exporting. */
+    val contentChecksumSha256: String? = null,
+    /** [org.openlgx.roads.export] artifact kind (e.g. RAW_UPLOAD, FILTERED_UPLOAD). */
+    val artifactKind: String? = null,
 )

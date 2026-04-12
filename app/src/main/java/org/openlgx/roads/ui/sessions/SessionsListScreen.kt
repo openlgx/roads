@@ -249,5 +249,10 @@ private fun SessionListRowBody(
                 (row.roughnessProxyScore?.let { " · roughness $it" } ?: ""),
             style = MaterialTheme.typography.bodySmall,
         )
+        Text(
+            "Hosted: ${row.hostedPipelineState}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

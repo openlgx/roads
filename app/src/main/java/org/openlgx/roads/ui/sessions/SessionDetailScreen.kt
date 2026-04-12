@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.openlgx.roads.data.local.db.model.SessionHostedPipelineState
 import org.openlgx.roads.upload.HostedPipelineDisplayState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +33,7 @@ fun SessionDetailScreen(
     val hostedDisplay by viewModel.hostedPipelineDisplay.collectAsStateWithLifecycle()
     val exportMessage by viewModel.exportMessage.collectAsStateWithLifecycle()
     val reprocessMessage by viewModel.reprocessMessage.collectAsStateWithLifecycle()
+    val uploadMessage by viewModel.uploadMessage.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -52,6 +54,9 @@ fun SessionDetailScreen(
         }
 
         val s = d.session
+        val canQueueHostedUpload =
+            s.hostedPipelineState == SessionHostedPipelineState.NOT_STARTED ||
+                s.hostedPipelineState == SessionHostedPipelineState.FAILED
         Column(
             modifier =
                 Modifier
@@ -160,8 +165,15 @@ fun SessionDetailScreen(
                 Button(onClick = viewModel::requestReprocess) {
                     Text("Reprocess")
                 }
+                Button(
+                    onClick = viewModel::uploadSessionToHosted,
+                    enabled = canQueueHostedUpload,
+                ) {
+                    Text("Upload to hosted")
+                }
             }
             reprocessMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            uploadMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
 
             Button(onClick = viewModel::exportSession) {
                 Text("Export session (folder + zip)")

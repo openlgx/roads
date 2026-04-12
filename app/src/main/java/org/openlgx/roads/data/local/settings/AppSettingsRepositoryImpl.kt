@@ -483,7 +483,7 @@ constructor(
          * Bump when pilot bootstrap defaults change so existing installs pick up new toggles
          * (URLs/IDs/key come from the bootstrap call each time version is behind).
          */
-        const val PILOT_BOOTSTRAP_LATEST_CONTENT_VERSION: Int = 3
+        const val PILOT_BOOTSTRAP_LATEST_CONTENT_VERSION: Int = 4
 
         fun sanitizeHostedUploadError(message: String): String {
             val t = message.trim().replace("\n", " ").take(400)

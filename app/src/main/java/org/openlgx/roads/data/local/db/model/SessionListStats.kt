@@ -19,4 +19,5 @@ data class SessionListStats(
     @ColumnInfo(name = "anomalyCount") val anomalyCount: Long,
     @ColumnInfo(name = "roughnessProxyScore") val roughnessProxyScore: Double?,
     @ColumnInfo(name = "processingLastError") val processingLastError: String?,
+    @ColumnInfo(name = "hostedPipelineState") val hostedPipelineState: SessionHostedPipelineState,
 )

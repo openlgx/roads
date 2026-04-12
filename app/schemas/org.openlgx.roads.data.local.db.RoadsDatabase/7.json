@@ -1,0 +1,1195 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 7,
+    "identityHash": "dfa73e528d7dbb62086535b96e3315c9",
+    "entities": [
+      {
+        "tableName": "device_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `installUuid` TEXT NOT NULL, `manufacturer` TEXT NOT NULL, `model` TEXT NOT NULL, `brand` TEXT NOT NULL, `sdkInt` INTEGER NOT NULL, `sensorCapabilitiesJson` TEXT, `normalizationParamsJson` TEXT, `lastProfiledAtEpochMs` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "installUuid",
+            "columnName": "installUuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "manufacturer",
+            "columnName": "manufacturer",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "model",
+            "columnName": "model",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brand",
+            "columnName": "brand",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sdkInt",
+            "columnName": "sdkInt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensorCapabilitiesJson",
+            "columnName": "sensorCapabilitiesJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "normalizationParamsJson",
+            "columnName": "normalizationParamsJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastProfiledAtEpochMs",
+            "columnName": "lastProfiledAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_device_profiles_installUuid",
+            "unique": true,
+            "columnNames": [
+              "installUuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_device_profiles_installUuid` ON `${TABLE_NAME}` (`installUuid`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "recording_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `uuid` TEXT NOT NULL, `armedAtEpochMs` INTEGER, `startedAtEpochMs` INTEGER NOT NULL, `endedAtEpochMs` INTEGER, `state` TEXT NOT NULL, `recordingSource` TEXT NOT NULL, `qualityFlags` INTEGER NOT NULL, `sessionUploadState` TEXT NOT NULL, `autoDetectionSnapshotJson` TEXT, `collectorStateSnapshotJson` TEXT, `sensorCaptureSnapshotJson` TEXT, `roadEligibilitySummaryJson` TEXT, `capturePassiveCollectionEnabled` INTEGER, `capturePolicySnapshotJson` TEXT, `uploadPolicyWifiOnly` INTEGER, `uploadPolicyAllowCellular` INTEGER, `uploadPolicyOnlyWhileCharging` INTEGER, `uploadPolicyPauseOnLowBattery` INTEGER, `uploadPolicyLowBatteryThresholdPercent` INTEGER, `roughnessProxyScore` REAL, `roughnessMethodVersion` TEXT, `roadResponseScore` REAL, `roadResponseMethodVersion` TEXT, `processingState` TEXT NOT NULL DEFAULT 'NOT_STARTED', `processingStartedAtEpochMs` INTEGER, `processingCompletedAtEpochMs` INTEGER, `processingLastError` TEXT, `processingSummaryJson` TEXT, `hostedPipelineState` TEXT NOT NULL DEFAULT 'NOT_STARTED')",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uuid",
+            "columnName": "uuid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "armedAtEpochMs",
+            "columnName": "armedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "startedAtEpochMs",
+            "columnName": "startedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endedAtEpochMs",
+            "columnName": "endedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordingSource",
+            "columnName": "recordingSource",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "qualityFlags",
+            "columnName": "qualityFlags",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionUploadState",
+            "columnName": "sessionUploadState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "autoDetectionSnapshotJson",
+            "columnName": "autoDetectionSnapshotJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "collectorStateSnapshotJson",
+            "columnName": "collectorStateSnapshotJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sensorCaptureSnapshotJson",
+            "columnName": "sensorCaptureSnapshotJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roadEligibilitySummaryJson",
+            "columnName": "roadEligibilitySummaryJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "capturePassiveCollectionEnabled",
+            "columnName": "capturePassiveCollectionEnabled",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "capturePolicySnapshotJson",
+            "columnName": "capturePolicySnapshotJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "uploadPolicyWifiOnly",
+            "columnName": "uploadPolicyWifiOnly",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "uploadPolicyAllowCellular",
+            "columnName": "uploadPolicyAllowCellular",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "uploadPolicyOnlyWhileCharging",
+            "columnName": "uploadPolicyOnlyWhileCharging",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "uploadPolicyPauseOnLowBattery",
+            "columnName": "uploadPolicyPauseOnLowBattery",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "uploadPolicyLowBatteryThresholdPercent",
+            "columnName": "uploadPolicyLowBatteryThresholdPercent",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roughnessProxyScore",
+            "columnName": "roughnessProxyScore",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roughnessMethodVersion",
+            "columnName": "roughnessMethodVersion",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roadResponseScore",
+            "columnName": "roadResponseScore",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roadResponseMethodVersion",
+            "columnName": "roadResponseMethodVersion",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "processingState",
+            "columnName": "processingState",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'NOT_STARTED'"
+          },
+          {
+            "fieldPath": "processingStartedAtEpochMs",
+            "columnName": "processingStartedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "processingCompletedAtEpochMs",
+            "columnName": "processingCompletedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "processingLastError",
+            "columnName": "processingLastError",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "processingSummaryJson",
+            "columnName": "processingSummaryJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "hostedPipelineState",
+            "columnName": "hostedPipelineState",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'NOT_STARTED'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_recording_sessions_uuid",
+            "unique": false,
+            "columnNames": [
+              "uuid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recording_sessions_uuid` ON `${TABLE_NAME}` (`uuid`)"
+          },
+          {
+            "name": "index_recording_sessions_startedAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "startedAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recording_sessions_startedAtEpochMs` ON `${TABLE_NAME}` (`startedAtEpochMs`)"
+          },
+          {
+            "name": "index_recording_sessions_state_startedAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "state",
+              "startedAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recording_sessions_state_startedAtEpochMs` ON `${TABLE_NAME}` (`state`, `startedAtEpochMs`)"
+          },
+          {
+            "name": "index_recording_sessions_hostedPipelineState",
+            "unique": false,
+            "columnNames": [
+              "hostedPipelineState"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recording_sessions_hostedPipelineState` ON `${TABLE_NAME}` (`hostedPipelineState`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "location_samples",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `elapsedRealtimeNanos` INTEGER NOT NULL, `wallClockUtcEpochMs` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `speedMps` REAL, `bearingDegrees` REAL, `horizontalAccuracyMeters` REAL, `altitudeMeters` REAL, `roadEligibilityDisposition` TEXT NOT NULL, `eligibilityConfidence` REAL, `retainedRegardlessOfEligibility` INTEGER NOT NULL, FOREIGN KEY(`sessionId`) REFERENCES `recording_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "elapsedRealtimeNanos",
+            "columnName": "elapsedRealtimeNanos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wallClockUtcEpochMs",
+            "columnName": "wallClockUtcEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "speedMps",
+            "columnName": "speedMps",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "bearingDegrees",
+            "columnName": "bearingDegrees",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "horizontalAccuracyMeters",
+            "columnName": "horizontalAccuracyMeters",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "altitudeMeters",
+            "columnName": "altitudeMeters",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roadEligibilityDisposition",
+            "columnName": "roadEligibilityDisposition",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eligibilityConfidence",
+            "columnName": "eligibilityConfidence",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "retainedRegardlessOfEligibility",
+            "columnName": "retainedRegardlessOfEligibility",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_location_samples_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_location_samples_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recording_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "sensor_samples",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `elapsedRealtimeNanos` INTEGER NOT NULL, `wallClockUtcEpochMs` INTEGER NOT NULL, `sensorType` INTEGER NOT NULL, `x` REAL NOT NULL, `y` REAL NOT NULL, `z` REAL NOT NULL, `w` REAL, `accuracy` INTEGER, `roadEligibilityDisposition` TEXT NOT NULL, `eligibilityConfidence` REAL, FOREIGN KEY(`sessionId`) REFERENCES `recording_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "elapsedRealtimeNanos",
+            "columnName": "elapsedRealtimeNanos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wallClockUtcEpochMs",
+            "columnName": "wallClockUtcEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensorType",
+            "columnName": "sensorType",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "x",
+            "columnName": "x",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "y",
+            "columnName": "y",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "z",
+            "columnName": "z",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "w",
+            "columnName": "w",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "accuracy",
+            "columnName": "accuracy",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roadEligibilityDisposition",
+            "columnName": "roadEligibilityDisposition",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eligibilityConfidence",
+            "columnName": "eligibilityConfidence",
+            "affinity": "REAL",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_sensor_samples_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_sensor_samples_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recording_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "upload_batches",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER, `createdAtEpochMs` INTEGER NOT NULL, `payloadManifestJson` TEXT NOT NULL, `batchUploadState` TEXT NOT NULL, `attemptCount` INTEGER NOT NULL, `nextAttemptAtEpochMs` INTEGER, `lastErrorCategory` TEXT, `lastSuccessfulUploadAtEpochMs` INTEGER, `networkPolicySnapshotJson` TEXT, `localRawArtifactUri` TEXT, `localFilteredArtifactUri` TEXT, `remoteUploadJobId` TEXT, `remoteStorageKey` TEXT, `roadFilterSummaryJson` TEXT, `sourceSessionUuid` TEXT, `filterChangedPayload` INTEGER NOT NULL, `uploadSkipReason` TEXT, `contentChecksumSha256` TEXT, `artifactKind` TEXT, FOREIGN KEY(`sessionId`) REFERENCES `recording_sessions`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadManifestJson",
+            "columnName": "payloadManifestJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "batchUploadState",
+            "columnName": "batchUploadState",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attemptCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextAttemptAtEpochMs",
+            "columnName": "nextAttemptAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastErrorCategory",
+            "columnName": "lastErrorCategory",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastSuccessfulUploadAtEpochMs",
+            "columnName": "lastSuccessfulUploadAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "networkPolicySnapshotJson",
+            "columnName": "networkPolicySnapshotJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "localRawArtifactUri",
+            "columnName": "localRawArtifactUri",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "localFilteredArtifactUri",
+            "columnName": "localFilteredArtifactUri",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "remoteUploadJobId",
+            "columnName": "remoteUploadJobId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "remoteStorageKey",
+            "columnName": "remoteStorageKey",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roadFilterSummaryJson",
+            "columnName": "roadFilterSummaryJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sourceSessionUuid",
+            "columnName": "sourceSessionUuid",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "filterChangedPayload",
+            "columnName": "filterChangedPayload",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uploadSkipReason",
+            "columnName": "uploadSkipReason",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "contentChecksumSha256",
+            "columnName": "contentChecksumSha256",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "artifactKind",
+            "columnName": "artifactKind",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_upload_batches_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_upload_batches_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_upload_batches_batchUploadState",
+            "unique": false,
+            "columnNames": [
+              "batchUploadState"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_upload_batches_batchUploadState` ON `${TABLE_NAME}` (`batchUploadState`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recording_sessions",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "derived_window_features",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `windowStartElapsedNanos` INTEGER NOT NULL, `windowEndElapsedNanos` INTEGER NOT NULL, `windowLengthMetersApprox` REAL, `methodVersion` TEXT, `isExperimental` INTEGER NOT NULL, `roughnessProxyScore` REAL, `roadResponseScore` REAL, `qualityFlags` INTEGER NOT NULL, `roadEligibilityDisposition` TEXT NOT NULL, `eligibilityConfidence` REAL, `featureBundleJson` TEXT, `windowStartWallClockUtcEpochMs` INTEGER, `windowEndWallClockUtcEpochMs` INTEGER, `midLatitude` REAL, `midLongitude` REAL, `meanSpeedMps` REAL, `headingMeanDeg` REAL, `predPrimaryLabel` TEXT, `scoreCornering` REAL, `scoreVerticalShock` REAL, `scoreStableCruise` REAL, `windowIndex` INTEGER, FOREIGN KEY(`sessionId`) REFERENCES `recording_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "windowStartElapsedNanos",
+            "columnName": "windowStartElapsedNanos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "windowEndElapsedNanos",
+            "columnName": "windowEndElapsedNanos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "windowLengthMetersApprox",
+            "columnName": "windowLengthMetersApprox",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "methodVersion",
+            "columnName": "methodVersion",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isExperimental",
+            "columnName": "isExperimental",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "roughnessProxyScore",
+            "columnName": "roughnessProxyScore",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "roadResponseScore",
+            "columnName": "roadResponseScore",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "qualityFlags",
+            "columnName": "qualityFlags",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "roadEligibilityDisposition",
+            "columnName": "roadEligibilityDisposition",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eligibilityConfidence",
+            "columnName": "eligibilityConfidence",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "featureBundleJson",
+            "columnName": "featureBundleJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "windowStartWallClockUtcEpochMs",
+            "columnName": "windowStartWallClockUtcEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "windowEndWallClockUtcEpochMs",
+            "columnName": "windowEndWallClockUtcEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "midLatitude",
+            "columnName": "midLatitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "midLongitude",
+            "columnName": "midLongitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "meanSpeedMps",
+            "columnName": "meanSpeedMps",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "headingMeanDeg",
+            "columnName": "headingMeanDeg",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "predPrimaryLabel",
+            "columnName": "predPrimaryLabel",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "scoreCornering",
+            "columnName": "scoreCornering",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "scoreVerticalShock",
+            "columnName": "scoreVerticalShock",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "scoreStableCruise",
+            "columnName": "scoreStableCruise",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "windowIndex",
+            "columnName": "windowIndex",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_derived_window_features_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_derived_window_features_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_derived_window_features_sessionId_windowIndex",
+            "unique": false,
+            "columnNames": [
+              "sessionId",
+              "windowIndex"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_derived_window_features_sessionId_windowIndex` ON `${TABLE_NAME}` (`sessionId`, `windowIndex`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recording_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "anomaly_candidates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `timeElapsedRealtimeNanos` INTEGER, `anomalyType` TEXT NOT NULL, `score` REAL, `confidence` REAL, `methodVersion` TEXT, `qualityFlags` INTEGER NOT NULL, `detailsJson` TEXT, `wallClockUtcEpochMs` INTEGER, `latitude` REAL, `longitude` REAL, `speedMps` REAL, `headingDeg` REAL, `severityBucket` TEXT, `derivedWindowId` INTEGER, FOREIGN KEY(`sessionId`) REFERENCES `recording_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeElapsedRealtimeNanos",
+            "columnName": "timeElapsedRealtimeNanos",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "anomalyType",
+            "columnName": "anomalyType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "score",
+            "columnName": "score",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "confidence",
+            "columnName": "confidence",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "methodVersion",
+            "columnName": "methodVersion",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "qualityFlags",
+            "columnName": "qualityFlags",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "detailsJson",
+            "columnName": "detailsJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "wallClockUtcEpochMs",
+            "columnName": "wallClockUtcEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "speedMps",
+            "columnName": "speedMps",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "headingDeg",
+            "columnName": "headingDeg",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "severityBucket",
+            "columnName": "severityBucket",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "derivedWindowId",
+            "columnName": "derivedWindowId",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_anomaly_candidates_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_anomaly_candidates_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_anomaly_candidates_sessionId_wallClockUtcEpochMs",
+            "unique": false,
+            "columnNames": [
+              "sessionId",
+              "wallClockUtcEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_anomaly_candidates_sessionId_wallClockUtcEpochMs` ON `${TABLE_NAME}` (`sessionId`, `wallClockUtcEpochMs`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recording_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "segment_consensus_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `segmentKey` TEXT NOT NULL, `observedCount` INTEGER NOT NULL, `distinctDeviceCount` INTEGER NOT NULL, `consensusRoughnessProxy` REAL, `stabilityScore` REAL, `methodVersion` TEXT, `lastUpdatedEpochMs` INTEGER, `centroidLatitude` REAL, `centroidLongitude` REAL, `binSizeMetersApprox` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentKey",
+            "columnName": "segmentKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedCount",
+            "columnName": "observedCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distinctDeviceCount",
+            "columnName": "distinctDeviceCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "consensusRoughnessProxy",
+            "columnName": "consensusRoughnessProxy",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "stabilityScore",
+            "columnName": "stabilityScore",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "methodVersion",
+            "columnName": "methodVersion",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lastUpdatedEpochMs",
+            "columnName": "lastUpdatedEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "centroidLatitude",
+            "columnName": "centroidLatitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "centroidLongitude",
+            "columnName": "centroidLongitude",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "binSizeMetersApprox",
+            "columnName": "binSizeMetersApprox",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_segment_consensus_records_segmentKey",
+            "unique": true,
+            "columnNames": [
+              "segmentKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_segment_consensus_records_segmentKey` ON `${TABLE_NAME}` (`segmentKey`)"
+          },
+          {
+            "name": "index_segment_consensus_records_centroidLatitude_centroidLongitude",
+            "unique": false,
+            "columnNames": [
+              "centroidLatitude",
+              "centroidLongitude"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_segment_consensus_records_centroidLatitude_centroidLongitude` ON `${TABLE_NAME}` (`centroidLatitude`, `centroidLongitude`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "calibration_runs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `label` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `notes` TEXT, `parametersJson` TEXT, `status` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "parametersJson",
+            "columnName": "parametersJson",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'dfa73e528d7dbb62086535b96e3315c9')"
+    ]
+  }
+}

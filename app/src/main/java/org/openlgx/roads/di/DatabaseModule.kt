@@ -25,6 +25,7 @@ object DatabaseModule {
                 RoadsDatabaseMigrations.MIGRATION_3_4,
                 RoadsDatabaseMigrations.MIGRATION_4_5,
                 RoadsDatabaseMigrations.MIGRATION_5_6,
+                RoadsDatabaseMigrations.MIGRATION_6_7,
             )
             // Only v3+ ships non-destructive migration steps; older DBs cannot step to v5 safely.
             .fallbackToDestructiveMigrationFrom(1, 2)

@@ -60,12 +60,31 @@ interface RecordingSessionDao {
             0
           ) AS anomalyCount,
           s.roughnessProxyScore AS roughnessProxyScore,
-          s.processingLastError AS processingLastError
+          s.processingLastError AS processingLastError,
+          s.hostedPipelineState AS hostedPipelineState
         FROM recording_sessions s
         ORDER BY s.startedAtEpochMs DESC
         """,
     )
     fun observeSessionListStats(): Flow<List<SessionListStats>>
+
+    /**
+     * Completed sessions eligible for hosted upload (never attempted, failed, skipped,
+     * or stuck mid-upload). Used by manual backfill; oldest first.
+     *
+     * `UPLOADING` is included because a crash/kill between setting UPLOADING and
+     * writing the batch row leaves the session in a dead-end state that no automatic
+     * retry will ever recover.
+     */
+    @Query(
+        """
+        SELECT id FROM recording_sessions
+        WHERE state = 'COMPLETED'
+          AND hostedPipelineState IN ('NOT_STARTED', 'FAILED', 'UPLOAD_SKIPPED', 'UPLOADING')
+        ORDER BY startedAtEpochMs ASC
+        """,
+    )
+    suspend fun listSessionIdsEligibleForUpload(): List<Long>
 
     @Query("SELECT * FROM recording_sessions ORDER BY startedAtEpochMs DESC")
     suspend fun listAllSessionsOrdered(): List<RecordingSessionEntity>

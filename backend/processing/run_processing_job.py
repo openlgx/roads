@@ -148,7 +148,8 @@ def main():
                 cur.execute(
                     """
                     SELECT pj.id, pj.recording_session_id, a.storage_key, a.checksum,
-                           rs.council_id, rs.project_id, rs.client_session_uuid::text
+                           rs.council_id, rs.project_id, rs.client_session_uuid::text,
+                           a.part_storage_keys_json
                     FROM processing_jobs pj
                     JOIN recording_sessions rs ON rs.id = pj.recording_session_id
                     LEFT JOIN artifacts a ON a.id = COALESCE(rs.filtered_artifact_id, rs.raw_artifact_id)
@@ -170,6 +171,7 @@ def main():
                 council_id = str(row[4])
                 project_id = str(row[5])
                 client_uuid = str(row[6])
+                part_storage_keys_json = row[7]
 
                 cur.execute(
                     """
@@ -188,7 +190,18 @@ def main():
                     _delete_hosted_for_session(cur_del, session_id)
                 conn.commit()
 
-                raw = storage_download_bytes(bucket=bucket, object_key=storage_key)
+                if part_storage_keys_json:
+                    keys = part_storage_keys_json
+                    if isinstance(keys, str):
+                        keys = json.loads(keys)
+                    if not isinstance(keys, list) or not keys:
+                        raise ValueError("invalid part_storage_keys_json")
+                    chunks = [
+                        storage_download_bytes(bucket=bucket, object_key=str(k)) for k in keys
+                    ]
+                    raw = b"".join(chunks)
+                else:
+                    raw = storage_download_bytes(bucket=bucket, object_key=storage_key)
                 if artifact_checksum and _sha256_bytes(raw).lower() != str(artifact_checksum).lower():
                     raise ValueError("bundle checksum mismatch")
 

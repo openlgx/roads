@@ -92,6 +92,13 @@ class PassiveCollectionCoordinatorTest {
                                 sessionId: Long,
                                 settings: AppSettings,
                             ) = Unit
+
+                            override suspend fun enqueueBackfillAll(settings: AppSettings): Int = 0
+
+                            override suspend fun enqueueSingleSession(
+                                sessionId: Long,
+                                settings: AppSettings,
+                            ): String? = null
                         },
                     foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
                     recordingEventNotifier =
@@ -151,6 +158,13 @@ class PassiveCollectionCoordinatorTest {
                                 sessionId: Long,
                                 settings: AppSettings,
                             ) = Unit
+
+                            override suspend fun enqueueBackfillAll(settings: AppSettings): Int = 0
+
+                            override suspend fun enqueueSingleSession(
+                                sessionId: Long,
+                                settings: AppSettings,
+                            ): String? = null
                         },
                     foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
                     recordingEventNotifier =
@@ -228,6 +242,13 @@ class PassiveCollectionCoordinatorTest {
                                 sessionId: Long,
                                 settings: AppSettings,
                             ) = Unit
+
+                            override suspend fun enqueueBackfillAll(settings: AppSettings): Int = 0
+
+                            override suspend fun enqueueSingleSession(
+                                sessionId: Long,
+                                settings: AppSettings,
+                            ): String? = null
                         },
                     foregroundPresentationRegistry = CollectorForegroundPresentationRegistry(),
                     recordingEventNotifier =

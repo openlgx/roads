@@ -67,15 +67,15 @@ Typical HTTP status codes: `400` (validation), `401` / `403` (auth), `404` (miss
 | `clientSessionUuid` | uuid | yes | App `RecordingSessionEntity.uuid` |
 | `artifactKind` | string | yes | `RAW_UPLOAD` or `FILTERED_UPLOAD` |
 | `exportSchemaVersion` | int | yes | Matches export / `SessionExporter` schema |
-| `byteSize` | int | yes | Exact ZIP size in bytes |
-| `contentChecksumSha256` | string | yes | Lowercase hex, 64 chars |
-| `mimeType` | string | yes | e.g. `application/zip` |
+| `byteSize` | int | yes | Single ZIP: full file size. **Multipart:** size of **this part only** (bytes). |
+| `contentChecksumSha256` | string | yes | Lowercase hex, 64 chars — **whole file** for single ZIP; **this part’s** SHA-256 for multipart parts |
+| `mimeType` | string | yes | e.g. `application/zip` (single) or `application/octet-stream` (multipart parts) |
 
-Optional (alpha may omit): `startedAtEpochMs` (ms since epoch; used for storage path date partitioning), `multipart`, `chunkIndex`, `chunkTotal`.
+Optional: `startedAtEpochMs` (ms since epoch; used for storage path date partitioning).
 
-**Chunking:** Alpha response includes implicit single-part upload (`multipart` not required). Future responses may add chunk manifest fields (`chunkId`, etc.) without changing `apiVersion` if backward compatible.
+**Multipart object** (`multipart`, optional): when set, this request creates one **part** of a logical ZIP. All parts share the same `multipart.groupId` (UUID), `multipart.partTotal`, `multipart.wholeFileBytes`, and `multipart.wholeFileChecksumSha256`. Each part has a distinct `multipart.partIndex` (0-based). Storage object keys are the normal `…/{sessionUuid}.zip` path with a **`.part0000`**, **`.part0001`**, … suffix.
 
-**Size limits:** Uploads are capped server-side (current implementation: **52,428,800** bytes ≈ 50 MiB). Document [Supabase Storage limits](https://supabase.com/docs/guides/storage) for your plan; very large bundles may require multipart in a later contract revision.
+**Size limits (two layers):** (1) **Logical ZIP** (`byteSize` for single-part, or `multipart.wholeFileBytes` for multipart): Edge rejects above **1 GiB**. (2) **Each Storage object** (each signed PUT): must stay **≤ 48 MiB** when using multipart (Edge `CHUNK_MAX_BYTES`, under Supabase Free **50 MiB** per object). Single-part uploads may request up to **1 GiB** `byteSize` at the Edge, but **Storage** still enforces its own cap — on **Free**, a single PUT **cannot exceed 50 MiB**; use **multipart** for larger bundles. **Pro+** can raise Storage’s global limit in the dashboard. See [setup-hosted-alpha.md](setup-hosted-alpha.md#storage-size-limit-vs-edge-uploads-create).
 
 ### Response `200`
 
@@ -93,11 +93,14 @@ Optional (alpha may omit): `startedAtEpochMs` (ms since epoch; used for storage 
 | `maxBytes` | int | Must match or cap requested `byteSize` |
 | `artifactKind` | string | Echo of request (`RAW_UPLOAD` / `FILTERED_UPLOAD`) |
 | `bucket` | string | Alias of `storageBucket` |
-| `multipart` | bool | `false` for single-part PUT |
+| `multipart` | bool | `true` when the request body included `multipart` |
+| `multipartGroupId` | uuid \| null | Echo when multipart |
+| `multipartPartIndex` | int \| null | Echo when multipart |
+| `multipartPartTotal` | int \| null | Echo when multipart |
 | `checksumAlgorithm` | string | `sha256` |
 | `requiredHeaders` | object | Echo of headers required on PUT |
 
-**Multipart scaffold (future):** Chunk fields may be added without bumping `apiVersion`; clients should ignore unknown keys.
+Clients should ignore unknown response keys.
 
 ---
 
@@ -120,11 +123,14 @@ Optional (alpha may omit): `startedAtEpochMs` (ms since epoch; used for storage 
 | Field | Type | Notes |
 |-------|------|-------|
 | `uploadJobId` | uuid | |
-| `state` | string | `COMPLETED` when successful |
-| `artifactId` | uuid | Neon `artifacts.id` |
+| `state` | string | `COMPLETED` when the logical upload is finished; `PART_UPLOADED` when a multipart **part** is verified but more parts remain |
+| `artifactId` | uuid \| null | Set when the logical artifact exists (`null` while multipart parts are still in flight) |
 | `processingJobId` | uuid \| null | New `processing_jobs` row when enqueued |
+| `multipartPending` | bool | `true` when `state` is `PART_UPLOADED` or artifact not yet created |
+| `completedParts` | int | Parts verified so far (multipart) or `1` for single-blob |
+| `totalParts` | int | Total parts (multipart) or `1` for single-blob |
 
-**Idempotency:** Repeating complete with the same checksum yields the same final state; duplicate artifacts are not created.
+**Idempotency:** Repeating complete with the same checksum yields the same final state; duplicate artifacts are not created. For multipart, completing the **last** part creates one `artifacts` row with `part_storage_keys_json` listing all part keys in order.
 
 **Storage verification:** Before inserting artifacts, the function performs a **ranged read** against Storage to confirm the object exists and its **total byte length** matches `byteSize`. On mismatch or missing object, the API returns **`412 Precondition Failed`** (`precondition_failed`) and leaves the upload job incomplete.
 
@@ -134,8 +140,8 @@ Optional (alpha may omit): `startedAtEpochMs` (ms since epoch; used for storage 
 
 All paths use **UTC** year/month with **two-digit month** `mm`.
 
-- Raw ZIP: `raw/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip`
-- Filtered ZIP: `filtered/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip`
+- Raw ZIP: `raw/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip` (multipart: append `.part0000`, `.part0001`, …)
+- Filtered ZIP: `filtered/{councilSlug}/{projectSlug}/{deviceId}/{yyyy}/{mm}/{sessionUuid}.zip` (multipart: same suffix pattern)
 - Road pack GeoJSON: `roadpacks/{councilSlug}/{version}/public-roads.geojson` (FlatGeobuf optional later)
 - Published layers: `published/{councilSlug}/roughness/latest.geojson` (and `anomalies`, `consensus`)
 - Published manifest: `published/{councilSlug}/manifest.json`

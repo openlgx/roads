@@ -66,11 +66,11 @@ def window_row_to_payload(
 ) -> dict[str, Any]:
     mid_lat = float(row.get("mid_latitude", math.nan))
     mid_lon = float(row.get("mid_longitude", math.nan))
-    geom: dict[str, Any]
+    geom: dict[str, Any] | None
     if math.isfinite(mid_lat) and math.isfinite(mid_lon):
         geom = {"type": "Point", "coordinates": [mid_lon, mid_lat]}
     else:
-        geom = {"type": "Point", "coordinates": [0.0, 0.0]}
+        geom = None
 
     return {
         "councilId": council_id,
@@ -103,7 +103,7 @@ def anomaly_row_to_payload(
     geom = (
         {"type": "Point", "coordinates": [mid_lon, mid_lat]}
         if math.isfinite(mid_lat) and math.isfinite(mid_lon)
-        else {"type": "Point", "coordinates": [0.0, 0.0]}
+        else None
     )
     hvs = row.get("heuristic_vertical_shock", 0)
     try:

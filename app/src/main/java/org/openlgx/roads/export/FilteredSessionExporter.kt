@@ -45,19 +45,19 @@ constructor(
     suspend fun prepareForUpload(
         sessionId: Long,
         settings: AppSettings,
+        onPrepareProgress: (suspend (rowsDone: Long, rowsTotal: Long) -> Unit)? = null,
     ): Result<UploadPreparation> =
         withContext(Dispatchers.IO) {
             val slug = settings.uploadCouncilSlug.trim()
             val filterOn =
                 settings.uploadRoadFilterEnabled && roadPackManager.hasPackForCouncil(slug)
-            roadPackManager.getDiagnostics(slug)
+            val diag = roadPackManager.getDiagnostics(slug)
             val geoReady =
-                filterOn && roadPackManager.getDiagnostics(slug).loadError == null &&
-                    roadPackManager.getDiagnostics(slug).segmentCount > 0
+                filterOn && diag.loadError == null && diag.segmentCount > 0
 
             if (!filterOn || !geoReady) {
                 val export =
-                    sessionExporter.exportSession(sessionId).getOrElse {
+                    sessionExporter.exportSession(sessionId, onPrepareProgress).getOrElse {
                         return@withContext Result.failure(it)
                     }
                 val manifestText = File(export.directory, "manifest.json").readText()
@@ -88,7 +88,6 @@ constructor(
             }
 
             val index = roadPackManager.getLocalIndex(slug)
-            val diag = roadPackManager.getDiagnostics(slug)
             val locations = database.locationSampleDao().listAllForSessionOrdered(sessionId)
             val (keptIds, stats) =
                 RoadPackFilterEngine.computeKeptLocations(
@@ -108,18 +107,18 @@ constructor(
                 )
             }
 
+            val keptLocs =
+                locations.filter { keptIds.contains(it.id) }
+                    .sortedBy { it.wallClockUtcEpochMs }
+
             val filtered =
                 sessionExporter.exportSessionFilteredForUpload(
                     sessionId = sessionId,
-                    keptLocationIds = keptIds,
+                    keptLocations = keptLocs,
                     roadPackVersion = diag.packVersion,
                     roadFilterSummaryJson = summaryJson,
+                    onExportProgress = onPrepareProgress,
                 ).getOrElse { return@withContext Result.failure(it) }
-
-            val full =
-                sessionExporter.exportSession(sessionId).getOrElse {
-                    return@withContext Result.failure(it)
-                }
 
             val manifestText = File(filtered.directory, "manifest.json").readText()
             val filterChanged = keptIds.size < locations.size
@@ -131,7 +130,7 @@ constructor(
                         roadFilterSummaryJson = summaryJson,
                         artifactKind = "FILTERED_UPLOAD",
                         payloadManifestJson = manifestText,
-                        localRawArtifactUri = full.zipFile.absolutePath,
+                        localRawArtifactUri = null,
                         localFilteredArtifactUri = filtered.zipFile.absolutePath,
                         filterChangedPayload = filterChanged,
                     ),

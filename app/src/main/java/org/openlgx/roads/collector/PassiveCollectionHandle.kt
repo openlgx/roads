@@ -10,6 +10,9 @@ interface PassiveCollectionHandle {
 
     fun start()
 
+    /** Poke the reconcile loop (e.g. from keepalive after process survival). */
+    fun nudge()
+
     fun debugSetSimulateDriving(active: Boolean?)
 
     fun debugForceStartRecording()

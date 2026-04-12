@@ -13,6 +13,7 @@ import kotlin.io.DEFAULT_BUFFER_SIZE
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import org.json.JSONArray
 import org.json.JSONObject
 import org.openlgx.roads.BuildConfig
@@ -45,7 +46,14 @@ constructor(
     private val appSettingsRepository: AppSettingsRepository,
 ) {
 
-    suspend fun exportSession(sessionId: Long): Result<SessionExportResult> =
+    /**
+     * @param onExportProgress Optional: [rowsDone] / [rowsTotal] while writing CSV/JSON (locations + sensors);
+     *   [rowsTotal] is an estimate from session detail counts (derived/anomaly add minor cost after).
+     */
+    suspend fun exportSession(
+        sessionId: Long,
+        onExportProgress: (suspend (rowsDone: Long, rowsTotal: Long) -> Unit)? = null,
+    ): Result<SessionExportResult> =
         withContext(Dispatchers.IO) {
             try {
                 val detail =
@@ -53,14 +61,27 @@ constructor(
                         ?: return@withContext Result.failure(IllegalArgumentException("Session not found"))
                 val session = detail.session
 
+                val rowsTotal =
+                    (detail.locationSampleCount + detail.sensorSampleCount).coerceAtLeast(1L)
+                var rowsDone = 0L
+                suspend fun report() {
+                    onExportProgress?.invoke(rowsDone, rowsTotal)
+                }
+
                 val root = File(context.getExternalFilesDir(null), "olgx_exports").apply { mkdirs() }
                 val folderName = "session_${session.uuid}_${System.currentTimeMillis()}"
                 val dir = File(root, folderName).apply { mkdirs() }
 
                 File(dir, "session.json").writeText(session.toExportJson().toString(2))
 
-                writeLocationCsvAndJson(dir, sessionId)
-                writeSensorCsvAndJson(dir, sessionId)
+                writeLocationCsvAndJson(dir, sessionId) { pageRows ->
+                    rowsDone += pageRows
+                    report()
+                }
+                writeSensorCsvAndJson(dir, sessionId) { pageRows ->
+                    rowsDone += pageRows
+                    report()
+                }
 
                 val derivedCount =
                     writeDerivedWindowFeaturesCsvAndJson(dir, sessionId)
@@ -108,12 +129,17 @@ constructor(
     /**
      * Filtered export: same canonical filenames as [exportSession]; additive [road_filter_summary.json]
      * and optional additive manifest keys only.
+     *
+     * @param keptLocations Pre-filtered location rows (same list used for road filter stats) to avoid a second
+     *   full-table load from SQLite.
+     * @param onExportProgress Optional row progress while writing (sensor pages after locations are written).
      */
     suspend fun exportSessionFilteredForUpload(
         sessionId: Long,
-        keptLocationIds: Set<Long>,
+        keptLocations: List<LocationSampleEntity>,
         roadPackVersion: String?,
         roadFilterSummaryJson: String,
+        onExportProgress: (suspend (rowsDone: Long, rowsTotal: Long) -> Unit)? = null,
     ): Result<SessionExportResult> =
         withContext(Dispatchers.IO) {
             try {
@@ -127,10 +153,15 @@ constructor(
 
                 File(dir, "session.json").writeText(session.toExportJson().toString(2))
 
-                val allLoc = database.locationSampleDao().listAllForSessionOrdered(sessionId)
-                val keptLocs =
-                    allLoc.filter { keptLocationIds.contains(it.id) }
-                        .sortedBy { it.wallClockUtcEpochMs }
+                val keptLocs = keptLocations.sortedBy { it.wallClockUtcEpochMs }
+                val sensorTotalEstimate = detail.sensorSampleCount.coerceAtLeast(1L)
+                val rowsTotal =
+                    (keptLocs.size.toLong() + sensorTotalEstimate).coerceAtLeast(1L)
+                var rowsDone = 0L
+                suspend fun report() {
+                    onExportProgress?.invoke(rowsDone, rowsTotal)
+                }
+
                 val ranges =
                     RoadPackFilterEngine.mergeIntervalsForSensors(
                         keptLocs,
@@ -138,7 +169,13 @@ constructor(
                     )
 
                 writeLocationListCsvAndJson(dir, keptLocs)
-                val sensorKept = writeSensorCsvAndJsonFiltered(dir, sessionId, ranges)
+                rowsDone += keptLocs.size.toLong()
+                report()
+                val sensorKept =
+                    writeSensorCsvAndJsonFiltered(dir, sessionId, ranges) { pageRows ->
+                        rowsDone += pageRows
+                        report()
+                    }
                 val allDerived = database.derivedWindowFeatureDao().listForSessionOrdered(sessionId)
                 val derivedFiltered =
                     allDerived.filter { rangesOverlapWallWindow(it, ranges) }
@@ -324,6 +361,7 @@ constructor(
     private suspend fun writeLocationCsvAndJson(
         dir: File,
         sessionId: Long,
+        onPageFinished: suspend (rowsInPage: Int) -> Unit = {},
     ) {
         val dao = database.locationSampleDao()
         val csv = File(dir, "location_samples.csv")
@@ -356,6 +394,8 @@ constructor(
                         cw.write("${row.eligibilityConfidence ?: ""},${row.retainedRegardlessOfEligibility}\n")
                     }
                     offset += page.size
+                    onPageFinished(page.size)
+                    yield()
                 }
             }
             jw.write("\n  ]\n}\n")
@@ -399,6 +439,7 @@ constructor(
         dir: File,
         sessionId: Long,
         ranges: List<LongRange>,
+        onKeptPage: suspend (keptRowsInPage: Int) -> Unit = {},
     ): Long {
         val dao = database.sensorSampleDao()
         val csv = File(dir, "sensor_samples.csv")
@@ -417,6 +458,7 @@ constructor(
                 while (true) {
                     val page = dao.pageForSessionOrdered(sessionId, pageSize, offset)
                     if (page.isEmpty()) break
+                    var keptThisPage = 0
                     for (row in page) {
                         if (!RoadPackFilterEngine.wallClockInAnyRange(row.wallClockUtcEpochMs, ranges)) {
                             continue
@@ -432,8 +474,13 @@ constructor(
                                 "${row.eligibilityConfidence ?: ""}\n",
                         )
                         count++
+                        keptThisPage++
                     }
                     offset += page.size
+                    if (keptThisPage > 0) {
+                        onKeptPage(keptThisPage)
+                    }
+                    yield()
                 }
             }
             jw.write("\n  ]\n}\n")
@@ -597,6 +644,7 @@ constructor(
     private suspend fun writeSensorCsvAndJson(
         dir: File,
         sessionId: Long,
+        onPageFinished: suspend (rowsInPage: Int) -> Unit = {},
     ) {
         val dao = database.sensorSampleDao()
         val csv = File(dir, "sensor_samples.csv")
@@ -628,23 +676,27 @@ constructor(
                         )
                     }
                     offset += page.size
+                    onPageFinished(page.size)
+                    yield()
                 }
             }
             jw.write("\n  ]\n}\n")
         }
     }
 
-    private fun zipDirectory(
+    private suspend fun zipDirectory(
         sourceDir: File,
         zipFile: File,
     ) {
         ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
             val base = sourceDir.absolutePath.length + 1
-            sourceDir.walkTopDown().filter { it.isFile }.forEach { file ->
+            val files = sourceDir.walkTopDown().filter { it.isFile }.toList()
+            for (file in files) {
                 val entryName = file.absolutePath.substring(base).replace('\\', '/')
                 zos.putNextEntry(ZipEntry(entryName))
                 file.inputStream().use { it.copyTo(zos) }
                 zos.closeEntry()
+                yield()
             }
         }
     }

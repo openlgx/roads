@@ -51,7 +51,7 @@ Diagnostics and Settings should show **active pack version**, **council slug**, 
 
 - **Same** `session.json` / canonical CSV+JSON names / `exportSchemaVersion` as full export; **additive** `manifest.json` keys (`roadFilterApplied`, `filterMethodVersion`, `roadPackVersion`) and **`road_filter_summary.json`** (counts, durations, suppression histogram, pack version).
 - **Low-value sessions:** auto-upload is **skipped** (`upload_batches.batchUploadState = SKIPPED`, `uploadSkipReason`); Room raw data unchanged.
-- `FilteredSessionExporter` builds the artifact used by `SessionUploadWorker`; a **full** export zip is still produced for `localRawArtifactUri` when a filtered upload is attempted.
+- `FilteredSessionExporter` builds the **filtered** artifact used by `SessionUploadWorker`; `localRawArtifactUri` is left unset for filtered runs (only the filtered ZIP is prepared—no second full export).
 
 ---
 
