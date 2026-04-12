@@ -19,5 +19,5 @@ object PilotBootstrapConfig {
      * and `local.properties` together.
      */
     const val HARDCODED_DEVICE_UPLOAD_API_KEY: String =
-        "olgx_du_5AtJmgOjwMg9ddJwOtwHTbGLpoxawg9f"
+        "olgx_du_znVWsyPQkQqfUfX425l7tp7HMIDLsq0a"
 }
